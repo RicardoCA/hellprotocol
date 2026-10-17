@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<title>Operação Tática — FPS Web (original)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #0b0d0c; color: #e8f0e8; font-family: "Segoe UI", Arial, sans-serif; }
+  #stage { position: relative; width: min(100vw, 1120px); margin: 0 auto; top: 50%; transform: translateY(-50%); }
+  #game { display: block; width: 100%; background: #000; image-rendering: pixelated; cursor: crosshair; border: 1px solid #233; border-radius: 6px; }
+  .layer { position: absolute; inset: 0; pointer-events: none; }
+  #cross { position: absolute; left: 50%; top: 50%; width: 26px; height: 26px; transform: translate(-50%, -50%); }
+  #cross::before, #cross::after { content: ""; position: absolute; background: rgba(120,255,140,.85); }
+  #cross::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
+  #cross::after { top: 50%; left: 0; height: 2px; width: 100%; transform: translateY(-50%); }
+  #cross.hit::before, #cross.hit::after { background: #ff5a4a; }
+  #hud { font-family: Consolas, "Courier New", monospace; }
+  #hpwrap { position: absolute; left: 14px; bottom: 12px; width: 230px; }
+  .bar { height: 14px; background: rgba(0,0,0,.55); border: 1px solid #3a4; border-radius: 3px; overflow: hidden; margin-top: 4px; }
+  .bar > i { display: block; height: 100%; background: linear-gradient(90deg,#3fae5a,#8cf08c); }
+  #armorbar > i { background: linear-gradient(90deg,#3f7fae,#8cd0f0); }
+  .lbl { font-size: 12px; letter-spacing: 1px; color: #9fd6a5; text-shadow: 0 1px 2px #000; }
+  #ammo { position: absolute; right: 16px; bottom: 10px; text-align: right; text-shadow: 0 2px 4px #000; }
+  #ammo .mag { font-size: 44px; font-weight: 700; color: #fff; }
+  #ammo .res { font-size: 20px; color: #9fd6a5; }
+  #wname { font-size: 14px; color: #cfe8cf; letter-spacing: 2px; }
+  #top { position: absolute; top: 10px; left: 14px; font-size: 13px; text-shadow: 0 1px 2px #000; }
+  #minimap { position: absolute; top: 10px; right: 12px; border: 1px solid #345; border-radius: 4px; opacity: .9; }
+  #feed { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 360px; text-align: center; font-size: 13px; }
+  #feed div { background: rgba(0,0,0,.45); margin: 3px auto; padding: 3px 8px; border-radius: 3px; transition: opacity .6s; }
+  #vig { position: absolute; inset: 0; }
+  #banner { position: absolute; left: 0; right: 0; top: 38%; text-align: center; pointer-events: none; }
+  #banner h2 { font-size: 42px; letter-spacing: 4px; text-shadow: 0 3px 8px #000; }
+  #banner p { font-size: 16px; color: #bfe8c4; }
+  .overlay { position: absolute; inset: 0; background: rgba(6,10,8,.86); display: flex; align-items: center; justify-content: center; text-align: center; pointer-events: auto; z-index: 5; }
+  .overlay.hidden, .hidden { display: none !important; }
+  .panel { max-width: 660px; padding: 28px 34px; }
+  .panel h1 { font-size: 34px; letter-spacing: 3px; margin-bottom: 8px; color: #eaffea; }
+  .panel h1 span { color: #7fe08a; }
+  .panel p { color: #b9d6bd; font-size: 14px; line-height: 1.5; }
+  .keys { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 16px auto; width: max-content; text-align: left; font-size: 14px; }
+  .keys b { color: #8fe6a0; font-family: Consolas, monospace; }
+  button.big { pointer-events: auto; cursor: pointer; margin-top: 14px; padding: 12px 44px; font-size: 18px; letter-spacing: 2px; color: #06130a; background: linear-gradient(180deg,#8cf08c,#3fae5a); border: 0; border-radius: 6px; font-weight: 700; }
+  button.big:hover { filter: brightness(1.1); }
+  .fine { margin-top: 14px; font-size: 11px; color: #7a9a7e; }
+  .maps { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
+  .mapbtn { pointer-events: auto; cursor: pointer; padding: 8px 18px; font-size: 14px; letter-spacing: 1px; color: #bfe8c4; background: rgba(30,44,34,.8); border: 1px solid #3a5a42; border-radius: 4px; }
+  .mapbtn:hover { background: rgba(48,70,54,.9); }
+  .mapbtn.sel { background: linear-gradient(180deg,#8cf08c,#3fae5a); color: #06130a; font-weight: 700; }
+  #slots { position: absolute; right: 16px; bottom: 96px; font-size: 12px; text-align: right; text-shadow: 0 1px 2px #000; }
+  #slots span { display: block; color: #6a7a6c; margin-top: 2px; }
+  #slots span.on { color: #bff5c4; font-weight: 700; }
+  .bar.mini { height: 8px; }
+  .bar.mini > i { background: linear-gradient(90deg,#c9a23c,#ffe27a); }
+  #xppanel { margin-top: 16px; width: 360px; margin-left: auto; margin-right: auto; background: rgba(0,0,0,.55); border: 1px solid #3a5a42; border-radius: 6px; padding: 10px 16px; }
+  #xptitle { font-size: 18px; letter-spacing: 2px; color: #ffe27a; text-shadow: 0 2px 4px #000; }
+  #xpbar2 { height: 14px; background: rgba(0,0,0,.6); border: 1px solid #3a5a42; border-radius: 3px; overflow: hidden; margin: 8px 0 4px; }
+  #xpbar2 > i { display: block; height: 100%; background: linear-gradient(90deg,#c9a23c,#ffe27a); }
+  #xpgain { font-size: 14px; color: #bfe8c4; font-family: Consolas, monospace; }
+  #xpxt { font-size: 12px; color: #bfe8c4; font-family: Consolas, monospace; }
+  #buytimer { position: absolute; top: 36px; left: 50%; transform: translateX(-50%); font-size: 14px; color: #ffe27a; text-shadow: 0 1px 3px #000; display: none; }
+  #buymenu { position: absolute; inset: 0; background: rgba(4,8,6,.55); display: flex; align-items: flex-start; justify-content: center; pointer-events: auto; z-index: 6; }
+  #buypanel { margin-top: 54px; background: rgba(8,14,10,.94); border: 1px solid #3a5a42; border-radius: 8px; padding: 16px 26px 14px; min-width: 430px; }
+  #buypanel h2 { font-size: 19px; letter-spacing: 2px; color: #eaffea; margin-bottom: 4px; }
+  .bmoney { font-size: 22px; color: #ffe27a; margin-bottom: 8px; font-family: Consolas, monospace; }
+  .bitem { display: flex; align-items: center; gap: 12px; padding: 7px 10px; border-radius: 4px; cursor: pointer; color: #cfe8cf; font-size: 15px; }
+  .bitem:hover { background: rgba(63,174,90,.25); }
+  .bnum { display: inline-block; width: 26px; text-align: center; background: #2c4434; border-radius: 3px; color: #8fe6a0; font-family: Consolas, monospace; }
+  .bprice { margin-left: auto; color: #ffe27a; font-family: Consolas, monospace; }
+  #buymsg { height: 18px; font-size: 13px; color: #ff8a7a; margin-top: 4px; }
+  .bhint { font-size: 11.5px; color: #7a9a7e; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="game" width="960" height="600"></canvas>
+
+  <div id="hud" class="layer">
+    <div id="cross"></div>
+    <div id="vig"></div>
+    <div id="top">ROUND <b id="round">1</b> · <span id="mapname">DEPÓSITO</span> · $<b id="money">800</b> · INIMIGOS <b id="left">0</b> · ABATES <b id="kills">0</b></div>
+    <div id="buytimer"></div>
+    <canvas id="minimap" width="132" height="132"></canvas>
+    <div id="hpwrap">
+      <div class="lbl">VIDA <span id="hpnum">100</span></div>
+      <div class="bar" id="hpbar"><i style="width:100%"></i></div>
+      <div class="lbl">COLETE <span id="arnum">0</span></div>
+      <div class="bar" id="armorbar"><i style="width:0%"></i></div>
+      <div class="lbl">NÍVEL <span id="lvl">1</span></div>
+      <div class="bar mini" id="xphudbar"><i id="xpfill" style="width:0%"></i></div>
+    </div>
+    <div id="ammo">
+      <div id="wname">PISTOLA</div>
+      <div><span class="mag" id="mag">12</span> <span class="res">/ <span id="res">36</span></span></div>
+    </div>
+    <div id="slots"><span id="s1" class="on">1 PISTOLA</span><span id="s2">2 .50</span><span id="s3">3 ESCOPETA</span><span id="s4">4 FUZIL</span><span id="s5">5 METRA</span></div>
+    <div id="feed"></div>
+    <div id="banner" class="hidden"><h2 id="bh"></h2><p id="bp"></p>
+      <div id="xppanel" class="hidden">
+        <div id="xptitle">NÍVEL 1</div>
+        <div id="xpbar2"><i id="xpfill2" style="width:0%"></i></div>
+        <div id="xpgain"></div>
+        <div id="xpxt"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="menu" class="overlay">
+    <div class="panel">
+      <h1>OPERAÇÃO <span>TÁTICA</span></h1>
+      <p>FPS tático 100% original no navegador: raycasting próprio, 3 arenas selecionáveis, 3 armas, bots com IA, pickups e minimapa.</p>
+      <div class="keys">
+        <b>W A S D</b><span>mover</span>
+        <b>Mouse</b><span>mirar</span>
+        <b>Clique esq.</b><span>atirar</span>
+        <b>R</b><span>recarregar</span>
+        <b>1 / 2 / 3</b><span>pistola / fuzil / escopeta</span>
+        <b>Shift</b><span>andar devagar</span>
+        <b>M</b><span>minimapa</span>
+        <b>Esc</b><span>pausar</span>
+      </div>
+      <div class="maps">
+        <button class="mapbtn sel" id="map1">DEPÓSITO</button>
+        <button class="mapbtn" id="map2">PÁTIO</button>
+        <button class="mapbtn" id="map3">SILO</button>
+      </div>
+      <p id="menulvl"></p>
+      <p id="best"></p>
+      <button class="big" id="play">JOGAR</button>
+      <p class="fine">Código, artes e sons 100% originais gerados por código — nenhum asset ou código de terceiros. Funciona offline: basta abrir este index.html.</p>
+    </div>
+  </div>
+
+  <div id="pause" class="overlay hidden">
+    <div class="panel">
+      <h1>PAUSADO</h1>
+      <p>Clique em continuar para voltar ao combate.</p>
+      <button class="big" id="resume">CONTINUAR</button>
+    </div>
+  </div>
+
+  <div id="buymenu" class="hidden">
+    <div id="buypanel">
+      <h2>MENU DE COMPRA</h2>
+      <div class="bmoney">$ <span id="bmoney">800</span></div>
+      <div id="buyitems"></div>
+      <div id="buymsg"></div>
+      <p class="bhint">[1-6] comprar · [B] fechar · os inimigos só entram em ação quando o tempo de compra acabar</p>
+    </div>
+  </div>
+</div>
+
+<script src="audio.js"></script>
+<script src="textures.js"></script>
+<script src="engine.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
