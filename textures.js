@@ -183,8 +183,180 @@ const Tex = (function () {
     g.fillStyle = '#d7e8bd'; g.fillRect(30, 30, 4, 4);
     return finish(c);
   }
-  // ---------- soldado inimigo 64x64 ----------
-  // frames: 0-3 andar, 4 atirar, 5 caindo, 6 morto
+  // ---------- temas por mapa: chão e teto exclusivos de cada arena ----------
+  function sandFloor() {
+    const c = cnv(64, 64), g = c.getContext('2d'), r = rng(77);
+    g.fillStyle = '#c9ab74'; g.fillRect(0, 0, 64, 64);
+    for (let i = 0; i < 340; i++) {
+      const v = (r() * 26 - 13) | 0;
+      g.fillStyle = 'rgba(' + (201 + v) + ',' + (171 + v) + ',' + (116 + v) + ',0.55)';
+      g.fillRect((r() * 64) | 0, (r() * 64) | 0, 2, 2);
+    }
+    g.strokeStyle = 'rgba(176,144,92,0.35)'; g.lineWidth = 2;
+    for (let i = 0; i < 6; i++) {
+      g.beginPath(); g.moveTo(0, 8 + i * 11 + r() * 4);
+      g.bezierCurveTo(20, 4 + i * 11, 44, 14 + i * 11, 64, 8 + i * 11); g.stroke();
+    }
+    for (let i = 0; i < 10; i++) {
+      g.fillStyle = 'rgba(120,96,58,' + (0.35 + r() * 0.3) + ')';
+      g.beginPath(); g.arc(r() * 64, r() * 64, 1.5 + r() * 2, 0, 6.283); g.fill();
+    }
+    return finish(c);
+  }
+  function sandFloor2() {
+    const c = cnv(64, 64), g = c.getContext('2d'), r = rng(78);
+    g.fillStyle = '#b8945c'; g.fillRect(0, 0, 64, 64);
+    for (let i = 0; i < 320; i++) {
+      const v = (r() * 24 - 12) | 0;
+      g.fillStyle = 'rgba(' + (184 + v) + ',' + (148 + v) + ',' + (92 + v) + ',0.55)';
+      g.fillRect((r() * 64) | 0, (r() * 64) | 0, 2, 2);
+    }
+    for (let i = 0; i < 6; i++) {
+      g.fillStyle = 'rgba(96,72,40,' + (0.12 + r() * 0.14) + ')';
+      g.beginPath(); g.arc(r() * 64, r() * 64, 5 + r() * 9, 0, 6.283); g.fill();
+    }
+    g.strokeStyle = 'rgba(70,50,24,0.4)'; g.lineWidth = 1;
+    for (let i = 0; i < 5; i++) {
+      let x = r() * 64, y = r() * 64;
+      g.beginPath(); g.moveTo(x, y);
+      for (let s = 0; s < 4; s++) { x += (r() * 14 - 7); y += (r() * 14 - 7); g.lineTo(x, y); }
+      g.stroke();
+    }
+    return finish(c);
+  }
+  function sandCeil() {
+    const c = cnv(64, 64), g = c.getContext('2d');
+    const grd = g.createLinearGradient(0, 0, 0, 64);
+    grd.addColorStop(0, '#8ec6ea'); grd.addColorStop(1, '#cfe6f2');
+    g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
+    g.fillStyle = 'rgba(255,255,255,0.8)';
+    for (let i = 0; i < 4; i++) {
+      const cx = 6 + i * 16, cy = 10 + ((i * 17) % 40);
+      g.beginPath(); g.ellipse(cx, cy, 10, 4, 0, 0, 6.283); g.fill();
+      g.beginPath(); g.ellipse(cx + 6, cy - 3, 6, 3, 0, 0, 6.283); g.fill();
+    }
+    g.fillStyle = 'rgba(255,246,214,0.9)';
+    g.beginPath(); g.arc(50, 12, 5, 0, 6.283); g.fill();
+    return finish(c);
+  }
+  function sunsetCeil() {
+    const c = cnv(64, 64), g = c.getContext('2d');
+    const grd = g.createLinearGradient(0, 0, 0, 64);
+    grd.addColorStop(0, '#e8a45c'); grd.addColorStop(0.55, '#f2c98a'); grd.addColorStop(1, '#d97b4a');
+    g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
+    g.fillStyle = 'rgba(255,236,180,0.95)';
+    g.beginPath(); g.arc(32, 46, 8, 0, 6.283); g.fill();
+    g.fillStyle = 'rgba(120,70,50,0.25)';
+    for (let i = 0; i < 5; i++) g.fillRect(0, 8 + i * 12, 64, 2);
+    return finish(c);
+  }
+  function forjaFloor() {
+    const c = cnv(64, 64), g = c.getContext('2d'), r = rng(79);
+    g.fillStyle = '#2e2320'; g.fillRect(0, 0, 64, 64);
+    for (let i = 0; i < 280; i++) {
+      const v = (r() * 18 - 9) | 0;
+      g.fillStyle = 'rgba(' + (58 + v) + ',' + (44 + v) + ',' + (38 + v) + ',0.6)';
+      g.fillRect((r() * 64) | 0, (r() * 64) | 0, 2, 2);
+    }
+    for (let py = 0; py < 64; py += 32) {
+      for (let px = 0; px < 64; px += 32) {
+        g.strokeStyle = 'rgba(0,0,0,0.5)'; g.lineWidth = 2;
+        g.strokeRect(px + 1, py + 1, 30, 30);
+      }
+    }
+    for (let i = 0; i < 12; i++) {
+      g.fillStyle = 'rgba(' + (200 + ((r() * 55) | 0)) + ',' + (80 + ((r() * 60) | 0)) + ',30,' + (0.25 + r() * 0.4) + ')';
+      g.fillRect((r() * 64) | 0, (r() * 64) | 0, 2, 2);
+    }
+    g.fillStyle = 'rgba(255,140,50,0.5)';
+    g.fillRect(28, 12, 8, 2);
+    return finish(c);
+  }
+  function forjaCeil() {
+    const c = cnv(64, 64), g = c.getContext('2d'), r = rng(80);
+    g.fillStyle = '#1c1210'; g.fillRect(0, 0, 64, 64);
+    for (let i = 0; i < 120; i++) {
+      g.fillStyle = 'rgba(255,120,40,' + (0.05 + r() * 0.10) + ')';
+      g.fillRect((r() * 64) | 0, (r() * 64) | 0, 2, 2);
+    }
+    g.fillStyle = '#0e0908';
+    g.fillRect(0, 30, 64, 4);
+    g.fillStyle = 'rgba(255,160,70,0.35)';
+    g.fillRect(0, 33, 64, 1);
+    return finish(c);
+  }
+  function patioFloor() {
+    const c = cnv(64, 64), g = c.getContext('2d'), r = rng(81);
+    g.fillStyle = '#8a8f86'; g.fillRect(0, 0, 64, 64);
+    for (let i = 0; i < 300; i++) {
+      const v = (r() * 20 - 10) | 0;
+      g.fillStyle = 'rgba(' + (138 + v) + ',' + (143 + v) + ',' + (134 + v) + ',0.5)';
+      g.fillRect((r() * 64) | 0, (r() * 64) | 0, 2, 2);
+    }
+    for (let py = 0; py < 64; py += 32) {
+      for (let px = 0; px < 64; px += 32) {
+        g.strokeStyle = 'rgba(70,74,66,0.5)'; g.lineWidth = 2;
+        g.strokeRect(px + 1, py + 1, 30, 30);
+        g.fillStyle = 'rgba(255,255,255,0.08)';
+        g.fillRect(px + 2, py + 2, 28, 3);
+      }
+    }
+    for (let i = 0; i < 8; i++) {
+      g.fillStyle = 'rgba(110,120,70,' + (0.25 + r() * 0.25) + ')';
+      g.fillRect((r() * 60) | 0, (r() * 60) | 0, 3, 2);
+    }
+    return finish(c);
+  }
+  function patioCeil() {
+    const c = cnv(64, 64), g = c.getContext('2d'), r = rng(82);
+    g.fillStyle = '#1a2432'; g.fillRect(0, 0, 64, 64);
+    for (let i = 0; i < 60; i++) {
+      const v = (0.15 + r() * 0.5).toFixed(2);
+      g.fillStyle = 'rgba(230,240,255,' + v + ')';
+      g.fillRect((r() * 64) | 0, (r() * 64) | 0, 1, 1);
+    }
+    g.fillStyle = 'rgba(226,232,240,0.9)';
+    g.beginPath(); g.arc(46, 14, 5, 0, 6.283); g.fill();
+    g.fillStyle = 'rgba(26,36,50,0.85)';
+    g.beginPath(); g.arc(48, 12, 4, 0, 6.283); g.fill();
+    return finish(c);
+  }
+  function siloFloor() {
+    const c = cnv(64, 64), g = c.getContext('2d'), r = rng(83);
+    g.fillStyle = '#565c63'; g.fillRect(0, 0, 64, 64);
+    for (let i = 0; i < 260; i++) {
+      const v = (r() * 18 - 9) | 0;
+      g.fillStyle = 'rgba(' + (86 + v) + ',' + (92 + v) + ',' + (99 + v) + ',0.5)';
+      g.fillRect((r() * 64) | 0, (r() * 64) | 0, 2, 2);
+    }
+    for (let py = 0; py < 64; py += 32) {
+      for (let px = 0; px < 64; px += 32) {
+        g.strokeStyle = 'rgba(20,24,28,0.55)'; g.lineWidth = 2;
+        g.strokeRect(px + 1, py + 1, 30, 30);
+        g.fillStyle = '#8d949c';
+        [[6, 6], [26, 6], [6, 26], [26, 26]].forEach(function (p) { g.fillRect(px + p[0], py + p[1], 2, 2); });
+      }
+    }
+    g.strokeStyle = 'rgba(30,34,38,0.35)'; g.lineWidth = 1;
+    for (let i = 0; i < 6; i++) {
+      const x = r() * 64, y = r() * 64;
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + 8 + r() * 10, y + (r() * 6 - 3)); g.stroke();
+    }
+    return finish(c);
+  }
+  function siloCeil() {
+    const c = cnv(64, 64), g = c.getContext('2d'), r = rng(84);
+    g.fillStyle = '#14171a'; g.fillRect(0, 0, 64, 64);
+    g.fillStyle = '#1e2226';
+    g.fillRect(0, 14, 64, 5); g.fillRect(0, 44, 64, 5);
+    g.fillStyle = '#31373e';
+    g.fillRect(0, 14, 64, 1); g.fillRect(0, 44, 64, 1);
+    g.fillStyle = '#b8c4a0';
+    g.fillRect(8, 15, 10, 3); g.fillRect(40, 45, 10, 3);
+    g.fillStyle = 'rgba(220,235,190,0.25)';
+    g.fillRect(6, 18, 14, 2); g.fillRect(38, 48, 14, 2);
+    return finish(c);
+  }
   function soldier(frame) {
     const c = cnv(64, 64), g = c.getContext('2d');
     if (frame === 6) {
@@ -592,6 +764,8 @@ const Tex = (function () {
     walls: [null, brick(7), concrete(11), crate(23), plaster(41), metal(67)],
     floor: floorTex(),
     ceil: ceilTex(),
+    floors: { 1: floorTex(), 2: patioFloor(), 3: siloFloor(), 4: sandFloor(), 5: sandFloor2(), 6: forjaFloor() },
+    ceils: { 1: ceilTex(), 2: patioCeil(), 3: siloCeil(), 4: sandCeil(), 5: sunsetCeil(), 6: forjaCeil() },
     bot: [soldier(0), soldier(1), soldier(2), soldier(3), soldier(4), soldier(5), soldier(6)],
     pickups: { health: medkit(), ammo: ammoBox(), armor: vest() },
     blood: bloodTex(),

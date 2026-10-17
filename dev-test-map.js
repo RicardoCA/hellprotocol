@@ -1,4 +1,4 @@
-/* Validação: conectividade dos 3 mapas via gancho __OT.mapInfo (headless, Node). */
+/* Validação: conectividade dos 6 mapas via gancho __OT.mapInfo (headless, Node). */
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -12,7 +12,7 @@ function fakeCtx() {
     getImageData(x, y, w, h) { const d = new Uint8ClampedArray(w * h * 4); return { data: d, width: w, height: h }; },
     createLinearGradient() { return { addColorStop() {} }; },
     putImageData() {}, drawImage() {}, fillRect() {}, strokeRect() {}, clearRect() {},
-    beginPath() {}, moveTo() {}, lineTo() {}, closePath() {}, fill() {}, stroke() {}, arc() {}, ellipse() {},
+    beginPath() {}, moveTo() {}, lineTo() {}, closePath() {}, fill() {}, stroke() {}, arc() {}, ellipse() {}, bezierCurveTo() {},
     save() {}, restore() {}, translate() {}, rotate() {}, scale() {},
     fillStyle: '', strokeStyle: '', lineWidth: 1, imageSmoothingEnabled: false, lineJoin: '', globalAlpha: 1
   };
@@ -68,7 +68,7 @@ const OT = global.window.__OT;
 if (!OT || !OT.mapInfo) throw new Error('gancho __OT.mapInfo ausente');
 
 let fail = 0;
-for (const id of [1, 2, 3]) {
+for (const id of [1, 2, 3, 4, 5, 6]) {
   const info = OT.mapInfo(id);
   const MW = 24, MH = 24, m = info.map;
   const px = info.playerSpawn[0] | 0, py = info.playerSpawn[1] | 0;

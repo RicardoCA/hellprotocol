@@ -2,7 +2,7 @@
 (function () {
 'use strict';
 
-// ---------- mapas (3 arenas originais 24x24) ----------
+// ---------- mapas (6 arenas 24x24) ----------
 const MW = 24, MH = 24;
 let map = new Uint8Array(MW * MH);
 let botSpawns = [], pickupsSpots = [];
@@ -33,6 +33,34 @@ function buildMap(id) {
     R(2, 20, 2, 1, 3);
     info.botSpawns = [[2.5, 2.5], [16.5, 2.5], [9.5, 7.5], [21.5, 7.5], [2.5, 12.5], [21.5, 16.5], [2.5, 17.5], [14.5, 20.5], [7.5, 15.5]];
     info.pickups = [[12.5, 13.5, 'health'], [20.5, 20.5, 'health'], [5.5, 7.5, 'armor'], [18.5, 10.5, 'armor'], [2.5, 6.5, 'ammo'], [12.5, 2.5, 'ammo'], [7.5, 17.5, 'ammo']];
+  } else if (id === 4) {
+    info.name = 'DUNAS';
+    // tema deserto: muros de adobe/reboco (1, 4) com caixotes de madeira (3)
+    R(6, 3, 1, 5, 1); R(6, 11, 1, 5, 1);
+    R(10, 7, 4, 1, 4); R(10, 15, 4, 1, 4);
+    R(17, 4, 3, 2, 1); R(20, 8, 2, 2, 4);
+    R(3, 4, 2, 2, 3); R(2, 14, 3, 1, 4);
+    R(15, 11, 2, 2, 3); R(9, 19, 3, 1, 4); R(4, 20, 2, 1, 1); R(19, 16, 3, 1, 3);
+    info.botSpawns = [[2.5, 2.5], [7.5, 4.5], [2.5, 8.5], [12.5, 3.5], [17.5, 2.5], [21.5, 3.5], [21.5, 12.5], [11.5, 12.5], [8.5, 21.5]];
+    info.pickups = [[2.5, 12.5, 'health'], [8.5, 8.5, 'ammo'], [13.5, 11.5, 'armor'], [21.5, 20.5, 'health'], [5.5, 17.5, 'ammo'], [17.5, 9.5, 'armor'], [11.5, 21.5, 'ammo']];
+  } else if (id === 5) {
+    info.name = 'OÁSIS';
+    // tema deserto: prédio central de adobe (1) com caixotes de madeira (3)
+    R(9, 9, 5, 4, 1);
+    R(3, 3, 2, 2, 3); R(18, 3, 2, 2, 3); R(3, 18, 2, 2, 3); R(18, 18, 2, 2, 3);
+    R(7, 6, 1, 2, 4); R(16, 15, 1, 2, 4); R(10, 18, 3, 1, 4);
+    info.botSpawns = [[2.5, 2.5], [7.5, 2.5], [16.5, 2.5], [21.5, 2.5], [2.5, 11.5], [21.5, 11.5], [11.5, 15.5], [2.5, 20.5], [20.5, 20.5]];
+    info.pickups = [[4.5, 15.5, 'health'], [19.5, 7.5, 'health'], [2.5, 6.5, 'armor'], [21.5, 13.5, 'armor'], [11.5, 16.5, 'ammo'], [6.5, 2.5, 'ammo'], [17.5, 21.5, 'ammo']];
+  } else if (id === 6) {
+    info.name = 'FORJA';
+    // tema industrial: muros de tijolo escuro (1) e metal (5)
+    R(4, 16, 1, 5, 5); R(5, 11, 1, 5, 5); R(6, 6, 1, 5, 5);
+    R(2, 2, 2, 2, 5);
+    R(11, 8, 2, 2, 1); R(15, 12, 2, 2, 1); R(13, 3, 1, 3, 5);
+    R(20, 5, 1, 3, 1); R(17, 2, 2, 1, 5); R(17, 16, 1, 3, 5);
+    R(10, 19, 3, 1, 1); R(9, 9, 1, 3, 5);
+    info.botSpawns = [[5.5, 2.5], [2.5, 9.5], [2.5, 20.5], [8.5, 2.5], [15.5, 2.5], [21.5, 2.5], [21.5, 10.5], [21.5, 20.5], [12.5, 12.5]];
+    info.pickups = [[2.5, 6.5, 'armor'], [20.5, 3.5, 'health'], [3.5, 15.5, 'health'], [12.5, 6.5, 'ammo'], [18.5, 15.5, 'armor'], [21.5, 17.5, 'ammo'], [9.5, 20.5, 'health']];
   } else {
     info.name = 'DEPÓSITO';
     R(2, 2, 3, 2, 2); R(7, 2, 5, 1, 3); R(15, 2, 1, 5, 4); R(19, 3, 3, 2, 2);
@@ -49,6 +77,9 @@ function applyMap(id) {
   const info = buildMap(id);
   map = info.map;
   botSpawns = info.botSpawns;
+  if (Engine.setFloorCeil && Tex.floors && Tex.ceils) {
+    Engine.setFloorCeil(Tex.floors[id] || Tex.floor, Tex.ceils[id] || Tex.ceil);
+  }
   pickupsSpots = info.pickups;
   PLAYER_SPAWN = info.playerSpawn;
   mapName = info.name;
@@ -853,10 +884,16 @@ const mapBtns = { 1: $('map1'), 2: $('map2'), 3: $('map3') };
 function selectMap(id) {
   selectedMap = id;
   for (const k in mapBtns) mapBtns[k].classList.toggle('sel', +k === id);
+  const ms = $('mapSel');
+  if (ms) ms.value = id <= 3 ? '' : String(id); // dropdown mostra placeholder quando mapa escolhido por botão
 }
 mapBtns[1].addEventListener('click', function () { selectMap(1); });
 mapBtns[2].addEventListener('click', function () { selectMap(2); });
 mapBtns[3].addEventListener('click', function () { selectMap(3); });
+$('mapSel').addEventListener('change', function () {
+  const v = +$('mapSel').value;
+  if (v >= 1) selectMap(v);
+});
 selectMap(1);
 
 // ---------- loop principal ----------

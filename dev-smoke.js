@@ -13,7 +13,7 @@ function fakeCtx() {
     getImageData(x, y, w, h) { const d = new Uint8ClampedArray(w * h * 4); return { data: d, width: w, height: h }; },
     createLinearGradient() { return { addColorStop() {} }; },
     putImageData() {}, drawImage() {}, fillRect() {}, strokeRect() {}, clearRect() {},
-    beginPath() {}, moveTo() {}, lineTo() {}, closePath() {}, fill() {}, stroke() {}, arc() {}, ellipse() {},
+    beginPath() {}, moveTo() {}, lineTo() {}, closePath() {}, fill() {}, stroke() {}, arc() {}, ellipse() {}, bezierCurveTo() {},
     save() {}, restore() {}, translate() {}, rotate() {}, scale() {},
     fillStyle: '', strokeStyle: '', lineWidth: 1, imageSmoothingEnabled: false, lineJoin: '', globalAlpha: 1
   };

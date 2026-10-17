@@ -100,7 +100,7 @@
   body.mobile .mkeys b { color: #8fe6a0; font-family: Consolas, monospace; }
   body.mobile button.big { margin-top: 8px; padding: 9px 28px; font-size: 15px; }
   body.mobile .maps { margin-top: 8px; }
-  body.mobile .mapbtn { padding: 7px 12px; font-size: 12px; }
+  body.mobile .mapbtn, body.mobile .mapsel { padding: 7px 12px; font-size: 12px; }
   body.mobile .fine { display: none; }
   body.mobile #buypanel { margin: 10px auto; width: min(92vw, 480px); min-width: 0; padding: 10px 16px 12px; }
   body.mobile #buypanel h2 { font-size: 16px; margin-bottom: 2px; }
@@ -121,6 +121,9 @@
   .mapbtn { pointer-events: auto; cursor: pointer; padding: 8px 18px; font-size: 14px; letter-spacing: 1px; color: #bfe8c4; background: rgba(30,44,34,.8); border: 1px solid #3a5a42; border-radius: 4px; }
   .mapbtn:hover { background: rgba(48,70,54,.9); }
   .mapbtn.sel { background: linear-gradient(180deg,#8cf08c,#3fae5a); color: #06130a; font-weight: 700; }
+  .mapsel { pointer-events: auto; cursor: pointer; padding: 8px 12px; font-size: 14px; letter-spacing: 1px; color: #bfe8c4; background: rgba(30,44,34,.8); border: 1px solid #3a5a42; border-radius: 4px; font-family: inherit; }
+  .mapsel:hover { background: rgba(48,70,54,.9); }
+  .mapsel option { background: #14201a; color: #bfe8c4; }
   #slots { position: absolute; right: 16px; bottom: 96px; font-size: 12px; text-align: right; text-shadow: 0 1px 2px #000; }
   #slots span { display: block; color: #6a7a6c; margin-top: 2px; }
   #slots span.on { color: #bff5c4; font-weight: 700; }
@@ -182,7 +185,7 @@
   <div id="menu" class="overlay">
     <div class="panel">
       <h1>OPERAÇÃO <span>TÁTICA</span></h1>
-      <p>FPS tático 100% original no navegador: raycasting próprio, 3 arenas selecionáveis, 3 armas, bots com IA, pickups e minimapa.</p>
+      <p>FPS tático 100% original no navegador: raycasting próprio, 6 arenas selecionáveis com temas visuais próprios (Depósito, Pátio, Silo, Dunas, Oásis e Forja), 3 armas, bots com IA, pickups e minimapa.</p>
       <div class="keys">
         <b>W A S D</b><span>mover</span>
         <b>Mouse</b><span>mirar</span>
@@ -206,6 +209,12 @@
         <button class="mapbtn sel" id="map1">DEPÓSITO</button>
         <button class="mapbtn" id="map2">PÁTIO</button>
         <button class="mapbtn" id="map3">SILO</button>
+        <select id="mapSel" class="mapsel">
+          <option value="">MAIS MAPAS…</option>
+          <option value="4">DUNAS</option>
+          <option value="5">OÁSIS</option>
+          <option value="6">FORJA</option>
+        </select>
       </div>
       <p id="menulvl"></p>
       <p id="best"></p>

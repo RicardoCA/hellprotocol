@@ -14,6 +14,8 @@ const Engine = (function () {
 
   function setMap(w, h, data) { mapW = w; mapH = h; mapData = data; }
   function setTextures(t) { tex = t; }
+  // troca o chão/teto sem recriar as paredes (tema visual por mapa)
+  function setFloorCeil(f, c) { if (tex) { tex.floor = f; tex.ceil = c; } }
 
   function render(px, py, ang, sprites) {
     const dbg = Engine.debug ? [] : null;
