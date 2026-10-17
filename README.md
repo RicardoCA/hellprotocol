@@ -9,7 +9,7 @@ Jogo de tiro tático em primeira pessoa que roda **direto no navegador**, sem in
 ## Como jogar
 
 1. Dê um **duplo clique em `index.html`** (abre no navegador padrão). Ou, se preferir, sirva a pasta:
-   - `python -m http.server 8000` e acesse `http://localhost:8000/web-fps/`
+   - `python -m http.server 8000` e acesse `http://localhost:8000/hellprotocol/`
 2. Clique em **JOGAR** (isso também ativa o mouse-lock para mirar).
 
 ### Controles
