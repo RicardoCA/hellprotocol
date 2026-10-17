@@ -44,23 +44,48 @@
   button.big { pointer-events: auto; cursor: pointer; margin-top: 14px; padding: 12px 44px; font-size: 18px; letter-spacing: 2px; color: #06130a; background: linear-gradient(180deg,#8cf08c,#3fae5a); border: 0; border-radius: 6px; font-weight: 700; }
   .fine { margin-top: 14px; font-size: 11px; color: #7a9a7e; }
   /* ---------- controles móveis ---------- */
-  #mcontrols { position: absolute; inset: 0; pointer-events: none; display: none; touch-action: none; }
-  #mcontrols.on { display: block; }
-  #stickZone { position: absolute; left: 18px; bottom: 18px; width: 150px; height: 150px; pointer-events: auto; touch-action: none; }
-  #stickBase { position: absolute; left: 0; top: 0; width: 150px; height: 150px; border: 2px solid rgba(120,255,140,.35); border-radius: 50%; background: rgba(10,20,12,.35); }
-  #stickKnob { position: absolute; left: 50%; top: 50%; width: 62px; height: 62px; transform: translate(-50%, -50%); border-radius: 50%; background: rgba(120,255,140,.28); border: 2px solid rgba(120,255,140,.6); box-shadow: 0 0 10px rgba(60,220,90,.35); }
-  #lookZone { position: absolute; left: 0; top: 0; right: 0; bottom: 0; pointer-events: auto; touch-action: none; }
-  .mbtn { position: absolute; pointer-events: auto; touch-action: manipulation; border-radius: 50%; border: 2px solid rgba(120,255,140,.5); background: rgba(10,25,14,.55); color: #bff0c6; font-family: Consolas, monospace; font-size: 13px; font-weight: 700; letter-spacing: 1px; text-shadow: 0 1px 2px #000; user-select: none; -webkit-user-select: none; }
+  #mcontrols { position: absolute; inset: 0; pointer-events: none; display: none; touch-action: none; z-index: 2; }
+  body.mobile #mcontrols { display: block; }
+  #stickZone { position: absolute; left: 12px; bottom: 12px; width: 132px; height: 132px; pointer-events: auto; touch-action: none; }
+  #stickBase { position: absolute; left: 0; top: 0; width: 132px; height: 132px; border: 2px solid rgba(120,255,140,.35); border-radius: 50%; background: rgba(10,20,12,.35); }
+  #stickKnob { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; transform: translate(-50%, -50%); border-radius: 50%; background: rgba(120,255,140,.28); border: 2px solid rgba(120,255,140,.6); box-shadow: 0 0 10px rgba(60,220,90,.35); }
+  #lookZone { position: absolute; inset: 0; pointer-events: auto; touch-action: none; }
+  .mbtn { position: absolute; pointer-events: auto; touch-action: manipulation; border-radius: 50%; border: 2px solid rgba(120,255,140,.5); background: rgba(10,25,14,.55); color: #bff0c6; font-family: Consolas, monospace; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-shadow: 0 1px 2px #000; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
   .mbtn:active, .mbtn.press { background: rgba(80,220,110,.4); color: #fff; }
-  #bFire  { right: 22px;  bottom: 84px; width: 88px; height: 88px; font-size: 15px; }
-  #bReload{ right: 124px; bottom: 30px;  width: 60px; height: 60px; }
-  #bBuy   { right: 22px;  bottom: 30px;  width: 60px; height: 60px; }
-  #bMap   { right: 22px;  top: 156px;    width: 54px; height: 54px; }
-  #bPause { right: 22px;  top: 96px;     width: 54px; height: 54px; }
-  body.mobile #stage { width: 100vw; height: 100dvh; transform: none; top: 0; }
-  body.mobile #game { height: 100%; border-radius: 0; border: 0; }
+  #bFire  { right: 12px;  bottom: 12px; width: 88px; height: 88px; font-size: 15px; }
+  #bReload{ right: 114px; bottom: 12px; width: 60px; height: 60px; }
+  #bBuy   { right: 114px; bottom: 80px; width: 60px; height: 60px; }
+  #bPause { right: 12px;  top: 112px;   width: 48px; height: 48px; }
+  #bMap   { right: 12px;  top: 168px;   width: 48px; height: 48px; }
+  /* modo celular: tela cheia mantendo a proporção 960x600 e HUD reorganizado */
+  body.mobile { overflow: hidden; }
+  body.mobile #stage { width: 100vw; height: 100vh; height: 100dvh; display: flex; align-items: center; justify-content: center; }
+  body.mobile #game { width: min(100vw, 160vh); height: min(62.5vw, 100vh); border-radius: 0; border: 0; }
+  @supports (width: 100dvh) {
+    body.mobile #game { width: min(100vw, 160dvh); height: min(62.5vw, 100dvh); }
+  }
+  body.mobile #hpwrap { top: 30px; bottom: auto; width: 180px; }
+  body.mobile .lbl { font-size: 10px; }
+  body.mobile .bar { height: 10px; }
+  body.mobile #ammo { right: auto; left: 14px; top: 112px; bottom: auto; text-align: left; }
+  body.mobile #ammo .mag { font-size: 30px; }
+  body.mobile #ammo .res { font-size: 14px; }
+  body.mobile #wname { font-size: 12px; }
+  body.mobile #slots { right: auto; left: 176px; bottom: 14px; text-align: left; }
+  body.mobile #minimap { width: 96px; height: 96px; }
+  #bclose { pointer-events: auto; cursor: pointer; margin-top: 12px; padding: 10px 34px; font-size: 15px; letter-spacing: 2px; color: #06130a; background: linear-gradient(180deg,#8cf08c,#3fae5a); border: 0; border-radius: 6px; font-weight: 700; }
+  .mrotate { display: none; margin-top: 10px; font-size: 13px; color: #ffe27a; }
+  @media (pointer: coarse) and (orientation: portrait) { .mrotate { display: block; } }
+  @media (max-width: 760px) {
+    #feed { width: 82%; font-size: 11px; }
+    #top { font-size: 10px; }
+    .panel { max-width: 92vw; padding: 18px 20px; }
+    .panel h1 { font-size: 24px; }
+    #buypanel { min-width: 0; width: 92vw; margin-top: 20px; }
+    .bitem { font-size: 13px; }
+    .bhint { font-size: 10.5px; }
+  }
   button.big:hover { filter: brightness(1.1); }
-  .fine { margin-top: 14px; font-size: 11px; color: #7a9a7e; }
   .maps { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
   .mapbtn { pointer-events: auto; cursor: pointer; padding: 8px 18px; font-size: 14px; letter-spacing: 1px; color: #bfe8c4; background: rgba(30,44,34,.8); border: 1px solid #3a5a42; border-radius: 4px; }
   .mapbtn:hover { background: rgba(48,70,54,.9); }
@@ -144,6 +169,7 @@
       </div>
       <p id="menulvl"></p>
       <p id="best"></p>
+      <p class="mrotate">📱 Vire o celular na horizontal para jogar melhor.</p>
       <button class="big" id="play">JOGAR</button>
       <p class="fine">Código, artes e sons 100% originais gerados por código — nenhum asset ou código de terceiros. Funciona offline: basta abrir este index.html.</p>
     </div>
@@ -163,6 +189,7 @@
       <div class="bmoney">$ <span id="bmoney">800</span></div>
       <div id="buyitems"></div>
       <div id="buymsg"></div>
+      <button id="bclose">FECHAR</button>
       <p class="bhint">[1-6] comprar · [B] fechar · os inimigos só entram em ação quando o tempo de compra acabar</p>
     </div>
   </div>

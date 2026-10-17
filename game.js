@@ -93,7 +93,7 @@ let best = 0;
 try { best = +(localStorage.getItem('ot_best') || 0); } catch (e) {}
 
 // ---------- mobile (controles touch estilo emulador) ----------
-const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent) ||
+let isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent) ||
   (navigator.maxTouchPoints > 1 && window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
 const mStick = { active: false, id: null, dx: 0, dy: 0 };
 let mLookId = null, mLookLastX = 0;
@@ -887,6 +887,7 @@ BUY_LIST.forEach(function (item, i) {
   row.addEventListener('click', function () { buyItem(item.k); });
   $('buyitems').appendChild(row);
 });
+$('bclose').addEventListener('click', function () { toggleMenu(); });
 if (best > 0) $('best').textContent = 'Recorde: ' + best + ' rodada(s) vencida(s)';
 loadProgress();
 updateTop();
@@ -897,9 +898,12 @@ function updateMobileVis() {
   // mostra os controles só durante o combate; esconde no menu/pausa/loja/morte
   $('mcontrols').classList.toggle('hidden', !(state === 'play' && !menuOpen));
 }
-if (isMobile) {
+function initMobileControls() {
   document.body.classList.add('mobile');
   const mCtl = $('mcontrols');
+  // slots de arma passam a viver dentro da camada de controles (tocáveis e
+  // escondidos junto com os controles fora do combate)
+  mCtl.appendChild($('slots'));
   mCtl.addEventListener('contextmenu', function (e) { e.preventDefault(); });
   document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
 
@@ -1012,6 +1016,15 @@ if (isMobile) {
       }, { passive: false });
     })(i);
   }
+}
+if (isMobile) {
+  initMobileControls();
+} else {
+  // fallback: se a detecção falhar (ex.: iPad com user agent de desktop),
+  // o primeiro toque real ativa o modo celular
+  document.addEventListener('touchstart', function () {
+    if (!isMobile) { isMobile = true; initMobileControls(); }
+  }, { once: true, passive: true });
 }
 
 

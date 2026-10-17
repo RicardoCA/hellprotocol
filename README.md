@@ -6,13 +6,20 @@ Jogo de tiro tático em primeira pessoa que roda **direto no navegador**, sem in
 
 0. **Jogue online (GitHub Pages):** https://ricardoca.github.io/hellprotocol/
 1. Dê um **duplo clique em `index.html`** (abre no navegador padrão). Ou, se preferir, sirva a pasta:
-## Como jogar
-
-1. Dê um **duplo clique em `index.html`** (abre no navegador padrão). Ou, se preferir, sirva a pasta:
    - `python -m http.server 8000` e acesse `http://localhost:8000/hellprotocol/`
 2. Clique em **JOGAR** (isso também ativa o mouse-lock para mirar).
 
-### Controles
+### Controles no celular
+
+No celular os controles aparecem automaticamente durante o combate (jogue na **horizontal** para a melhor experiência):
+
+- **Joystick virtual** (canto inferior esquerdo) — analógico: encoste um pouco para andar devagar, empurre até a borda para correr
+- **Arrastar na tela** — mirar/girar a câmera (multi-toque: dá para mirar enquanto anda)
+- **FOGO** (canto inferior direito) — segure para armas automáticas
+- **REC** — recarregar · **COMPRA** — abre o menu de compra · **PAUSA** e **MAPA** — coluna à direita, abaixo do minimapa
+- **Slots 1-5** (base central-esquerda) — trocar de arma tocando
+
+### Controles (teclado e mouse)
 
 | Tecla | Ação |
 |---|---|
