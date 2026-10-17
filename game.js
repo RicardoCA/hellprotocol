@@ -929,17 +929,12 @@ $('play').addEventListener('click', function () {
   else lockPointer();
 });
 
-// ---------- seleção de mapa ----------
-const mapBtns = { 1: $('map1'), 2: $('map2'), 3: $('map3') };
+// ---------- seleção de mapa (dropdown único) ----------
 function selectMap(id) {
   selectedMap = id;
-  for (const k in mapBtns) mapBtns[k].classList.toggle('sel', +k === id);
   const ms = $('mapSel');
-  if (ms) ms.value = id <= 3 ? '' : String(id); // dropdown mostra placeholder quando mapa escolhido por botão
+  if (ms) ms.value = String(id);
 }
-mapBtns[1].addEventListener('click', function () { selectMap(1); });
-mapBtns[2].addEventListener('click', function () { selectMap(2); });
-mapBtns[3].addEventListener('click', function () { selectMap(3); });
 $('mapSel').addEventListener('change', function () {
   const v = +$('mapSel').value;
   if (v >= 1) selectMap(v);

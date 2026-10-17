@@ -1,4 +1,4 @@
-# Operação Tática — FPS Web
+# Hell Protocol — FPS Web
 
 Jogo de tiro tático em primeira pessoa que roda **direto no navegador**, sem instalação e offline. Motor de raycasting próprio (640×400), **economia estilo CS** ($ por abate, menu de compra com 10s no início do round), **sistema de XP/nível persistente em localStorage** (barra animada no fim de cada rodada), cinco armas com viewmodels detalhados e sombreados, **seis arenas selecionáveis com temas visuais próprios** (Depósito, Pátio, Silo, Dunas, Oásis e Forja — chão, teto e paleta de muros exclusivos de cada arena), **bots com pathfinding BFS** (patrulham, rondeiam perto do jogador, perseguem contornando paredes, fazem strafe em combate), animação de morte em 2 estágios, pickups, minimapa tático, recuo/fumaça/clarão nas armas e sons sintetizados em tempo real.
 
