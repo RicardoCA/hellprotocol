@@ -1,4 +1,4 @@
-# Operação Tática — FPS Web (100% original)
+# Operação Tática — FPS Web
 
 Jogo de tiro tático em primeira pessoa que roda **direto no navegador**, sem instalação e offline. Motor de raycasting próprio (640×400), **economia estilo CS** ($ por abate, menu de compra com 10s no início do round), **sistema de XP/nível persistente em localStorage** (barra animada no fim de cada rodada), cinco armas com viewmodels detalhados e sombreados, três arenas selecionáveis, **bots com pathfinding BFS** (patrulham, rondeiam perto do jogador, perseguem contornando paredes, fazem strafe em combate), animação de morte em 2 estágios, pickups, minimapa tático, recuo/fumaça/clarão nas armas e sons sintetizados em tempo real.
 
@@ -31,10 +31,3 @@ Jogo de tiro tático em primeira pessoa que roda **direto no navegador**, sem in
 - `node dev-smoke.js` — simula o jogo por ~80s: menu de compra (debitar/preencher), pausa de spawn com menu aberto, combate com recompensa (fuzil e escopeta), bônus de rodada, **XP/nível com persistência (F5 simulado)**, morte/retry e maratona sem exceções.
 
 O jogo expõe `window.__OT` (estado, spriteList, mapInfo) e `Engine.debug` apenas como ganchos de depuração para esses testes — podem ser ignorados em uso normal.
-
-## Nota importante (por que este jogo é original)
-
-- O repositório `github.com/morluto/rea` **não é um jogo**: é o "REA — Reverse engineer anything", um kit de ferramentas de análise/engenharia reversa de binários (licença MIT).
-- A pasta onde este projeto foi colocado contém uma cópia "Torrent Edition" do **Counter-Strike 1.6**, software **proprietário da Valve**.
-- **Não foi feita engenharia reversa nem cópia de código, mapas, modelos, texturas ou sons da Valve.** Isso violaria direitos autorais e a própria política de uso responsável do REA (restrita a software próprio ou autorizado).
-- Este jogo foi **escrito do zero**: raycasting em canvas, texturas/sprites gerados proceduralmente por código e áudio sintetizado via WebAudio. Nenhum asset de terceiros.
