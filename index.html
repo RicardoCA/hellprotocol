@@ -33,14 +33,15 @@
   #banner { position: absolute; left: 0; right: 0; top: 38%; text-align: center; pointer-events: none; }
   #banner h2 { font-size: 42px; letter-spacing: 4px; text-shadow: 0 3px 8px #000; }
   #banner p { font-size: 16px; color: #bfe8c4; }
-  .overlay { position: absolute; inset: 0; background: rgba(6,10,8,.86); display: flex; align-items: center; justify-content: center; text-align: center; pointer-events: auto; z-index: 5; }
+  .overlay { position: absolute; inset: 0; background: rgba(6,10,8,.86); display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; -webkit-overflow-scrolling: touch; text-align: center; pointer-events: auto; z-index: 5; }
   .overlay.hidden, .hidden { display: none !important; }
-  .panel { max-width: 660px; padding: 28px 34px; }
+  .panel { max-width: 660px; padding: 28px 34px; margin: auto; }
   .panel h1 { font-size: 34px; letter-spacing: 3px; margin-bottom: 8px; color: #eaffea; }
   .panel h1 span { color: #7fe08a; }
   .panel p { color: #b9d6bd; font-size: 14px; line-height: 1.5; }
   .keys { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 16px auto; width: max-content; text-align: left; font-size: 14px; }
   .keys b { color: #8fe6a0; font-family: Consolas, monospace; }
+  .mkeys { display: none; }
   button.big { pointer-events: auto; cursor: pointer; margin-top: 14px; padding: 12px 44px; font-size: 18px; letter-spacing: 2px; color: #06130a; background: linear-gradient(180deg,#8cf08c,#3fae5a); border: 0; border-radius: 6px; font-weight: 700; }
   .fine { margin-top: 14px; font-size: 11px; color: #7a9a7e; }
   /* ---------- controles móveis ---------- */
@@ -88,12 +89,25 @@
   @media (max-width: 760px) {
     #feed { width: 82%; font-size: 11px; }
     #top { font-size: 10px; }
-    .panel { max-width: 92vw; padding: 18px 20px; }
-    .panel h1 { font-size: 24px; }
-    #buypanel { min-width: 0; width: 92vw; margin-top: 20px; }
-    .bitem { font-size: 13px; }
-    .bhint { font-size: 10.5px; }
   }
+  /* ---------- menus compactos no celular (paisagem) ---------- */
+  body.mobile .overlay { padding: 8px 0; }
+  body.mobile .panel { padding: 10px 16px 12px; max-width: 94vw; }
+  body.mobile .panel h1 { font-size: 20px; letter-spacing: 2px; margin-bottom: 4px; }
+  body.mobile .panel p { font-size: 12px; line-height: 1.35; }
+  body.mobile .keys { display: none; }
+  body.mobile .mkeys { display: grid; font-size: 12px; gap: 2px 12px; margin: 8px auto; }
+  body.mobile .mkeys b { color: #8fe6a0; font-family: Consolas, monospace; }
+  body.mobile button.big { margin-top: 8px; padding: 9px 28px; font-size: 15px; }
+  body.mobile .maps { margin-top: 8px; }
+  body.mobile .mapbtn { padding: 7px 12px; font-size: 12px; }
+  body.mobile .fine { display: none; }
+  body.mobile #buypanel { margin: 10px auto; width: min(92vw, 480px); min-width: 0; padding: 10px 16px 12px; }
+  body.mobile #buypanel h2 { font-size: 16px; margin-bottom: 2px; }
+  body.mobile .bmoney { font-size: 18px; margin-bottom: 4px; }
+  body.mobile .bitem { font-size: 13px; padding: 5px 8px; }
+  body.mobile #bclose { margin-top: 8px; padding: 8px 24px; font-size: 13px; }
+  body.mobile .bhint { font-size: 10px; margin-top: 4px; }
   button.big:hover { filter: brightness(1.1); }
   .maps { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
   .mapbtn { pointer-events: auto; cursor: pointer; padding: 8px 18px; font-size: 14px; letter-spacing: 1px; color: #bfe8c4; background: rgba(30,44,34,.8); border: 1px solid #3a5a42; border-radius: 4px; }
@@ -111,8 +125,8 @@
   #xpgain { font-size: 14px; color: #bfe8c4; font-family: Consolas, monospace; }
   #xpxt { font-size: 12px; color: #bfe8c4; font-family: Consolas, monospace; }
   #buytimer { position: absolute; top: 36px; left: 50%; transform: translateX(-50%); font-size: 14px; color: #ffe27a; text-shadow: 0 1px 3px #000; display: none; }
-  #buymenu { position: absolute; inset: 0; background: rgba(4,8,6,.55); display: flex; align-items: flex-start; justify-content: center; pointer-events: auto; z-index: 6; }
-  #buypanel { margin-top: 54px; background: rgba(8,14,10,.94); border: 1px solid #3a5a42; border-radius: 8px; padding: 16px 26px 14px; min-width: 430px; }
+  #buymenu { position: absolute; inset: 0; background: rgba(4,8,6,.55); display: flex; align-items: flex-start; justify-content: center; overflow-y: auto; -webkit-overflow-scrolling: touch; pointer-events: auto; z-index: 6; }
+  #buypanel { margin: 18px auto; background: rgba(8,14,10,.94); border: 1px solid #3a5a42; border-radius: 8px; padding: 16px 26px 14px; min-width: 430px; }
   #buypanel h2 { font-size: 19px; letter-spacing: 2px; color: #eaffea; margin-bottom: 4px; }
   .bmoney { font-size: 22px; color: #ffe27a; margin-bottom: 8px; font-family: Consolas, monospace; }
   .bitem { display: flex; align-items: center; gap: 12px; padding: 7px 10px; border-radius: 4px; cursor: pointer; color: #cfe8cf; font-size: 15px; }
@@ -170,6 +184,15 @@
         <b>Shift</b><span>andar devagar</span>
         <b>M</b><span>minimapa</span>
         <b>Esc</b><span>pausar</span>
+      </div>
+      <div class="keys mkeys">
+        <b>Joystick</b><span>mover</span>
+        <b>Arrastar na tela</b><span>mirar</span>
+        <b>FOGO</b><span>atirar</span>
+        <b>REC</b><span>recarregar</span>
+        <b>1-5</b><span>trocar de arma</span>
+        <b>COMPRA</b><span>loja (10s de cada rodada)</span>
+        <b>PAUSA</b><span>pausar</span>
       </div>
       <div class="maps">
         <button class="mapbtn sel" id="map1">DEPÓSITO</button>
