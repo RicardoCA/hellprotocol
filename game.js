@@ -92,6 +92,12 @@ let hurtT = 0, hitT = 0;
 let best = 0;
 try { best = +(localStorage.getItem('ot_best') || 0); } catch (e) {}
 
+// ---------- mobile (controles touch estilo emulador) ----------
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent) ||
+  (navigator.maxTouchPoints > 1 && window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+const mStick = { active: false, id: null, dx: 0, dy: 0 };
+let mLookId = null, mLookLastX = 0;
+
 // ---------- DOM ----------
 const $ = function (id) { return document.getElementById(id); };
 const canvas = $('game'), ctx = canvas.getContext('2d');
@@ -199,6 +205,11 @@ function movePlayer(dt) {
   if (keys['KeyS']) fw -= 1;
   if (keys['KeyD']) st += 1;
   if (keys['KeyA']) st -= 1;
+  if (isMobile && mStick.active) {
+    // tela: para cima é -Y; no jogo, frente é +Y — joystick dá controle analógico (-1..1)
+    fw += -mStick.dy;
+    st += mStick.dx;
+  }
   if (keys['ArrowLeft']) player.a -= 2.6 * dt;
   if (keys['ArrowRight']) player.a += 2.6 * dt;
   const run = !keys['ShiftLeft'] && !keys['ShiftRight'];
@@ -764,6 +775,7 @@ document.addEventListener('mousemove', function (e) {
   if (locked && state === 'play') player.a += e.movementX * 0.0022;
 });
 canvas.addEventListener('mousedown', function (e) {
+  if (isMobile) return; // no celular o toque é tratado pelas zonas/botões touch
   if (state !== 'play') return;
   if (!locked) { lockPointer(); return; }
   if (e.button === 0) {
@@ -784,6 +796,7 @@ function pauseGame() {
 }
 function resumeNow() { state = 'play'; pauseOv.classList.add('hidden'); }
 function resumeClick() {
+  if (isMobile) { resumeNow(); return; }
   lockPointer();
   setTimeout(function () { if (!locked && state === 'pause') resumeNow(); }, 350);
 }
@@ -793,7 +806,7 @@ $('play').addEventListener('click', function () {
   Sfx.unlock();
   menuOv.classList.add('hidden');
   startRound(1);
-  lockPointer();
+  if (!isMobile) lockPointer();
 });
 
 // ---------- seleção de mapa ----------
@@ -859,6 +872,7 @@ function loop(ts) {
   if (minimapOn) drawMinimap();
   updateHud();
   updateTop();
+  updateMobileVis();
 }
 
 // ---------- inicialização ----------
@@ -877,6 +891,130 @@ if (best > 0) $('best').textContent = 'Recorde: ' + best + ' rodada(s) vencida(s
 loadProgress();
 updateTop();
 updateHud();
+// ---------- controles móveis (touch — estilo emulador) ----------
+function updateMobileVis() {
+  if (!isMobile) return;
+  // mostra os controles só durante o combate; esconde no menu/pausa/loja/morte
+  $('mcontrols').classList.toggle('hidden', !(state === 'play' && !menuOpen));
+}
+if (isMobile) {
+  document.body.classList.add('mobile');
+  const mCtl = $('mcontrols');
+  mCtl.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+
+  // --- joystick virtual (esquerda) ---
+  const stickZone = $('stickZone'), stickKnob = $('stickKnob');
+  function stickUpdate(t) {
+    const r = stickZone.getBoundingClientRect();
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    let dx = t.clientX - cx, dy = t.clientY - cy;
+    const dist = Math.sqrt(dx * dx + dy * dy), max = r.width / 2;
+    if (dist > max) { dx = dx / dist * max; dy = dy / dist * max; }
+    mStick.active = true;
+    mStick.dx = dx / max;
+    mStick.dy = dy / max;
+    stickKnob.style.transform = 'translate(calc(-50% + ' + dx + 'px), calc(-50% + ' + dy + 'px))';
+  }
+  function stickEnd(e) {
+    for (const t of e.changedTouches) {
+      if (t.identifier === mStick.id) {
+        mStick.active = false; mStick.id = null; mStick.dx = 0; mStick.dy = 0;
+        stickKnob.style.transform = 'translate(-50%, -50%)';
+      }
+    }
+  }
+  stickZone.addEventListener('touchstart', function (e) {
+    e.preventDefault();
+    if (mStick.id === null) {
+      const t = e.changedTouches[0];
+      mStick.id = t.identifier;
+      stickUpdate(t);
+    }
+  }, { passive: false });
+  stickZone.addEventListener('touchmove', function (e) {
+    e.preventDefault();
+    for (const t of e.changedTouches) if (t.identifier === mStick.id) stickUpdate(t);
+  }, { passive: false });
+  stickZone.addEventListener('touchend', stickEnd, { passive: false });
+  stickZone.addEventListener('touchcancel', stickEnd, { passive: false });
+
+  // --- zona de mira: arrastar no resto da tela gira a câmera ---
+  const lookZone = $('lookZone');
+  lookZone.addEventListener('touchstart', function (e) {
+    e.preventDefault();
+    if (mLookId === null) {
+      const t = e.changedTouches[0];
+      mLookId = t.identifier;
+      mLookLastX = t.clientX;
+    }
+  }, { passive: false });
+  lookZone.addEventListener('touchmove', function (e) {
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      if (t.identifier === mLookId && state === 'play') {
+        const dx = t.clientX - mLookLastX;
+        mLookLastX = t.clientX;
+        player.a += dx * 0.006;
+      }
+    }
+  }, { passive: false });
+  function lookEnd(e) {
+    for (const t of e.changedTouches) if (t.identifier === mLookId) mLookId = null;
+  }
+  lookZone.addEventListener('touchend', lookEnd, { passive: false });
+  lookZone.addEventListener('touchcancel', lookEnd, { passive: false });
+
+  // --- botões de ação (direita) ---
+  function bindBtn(id, onDown, onUp) {
+    const el = $(id);
+    el.addEventListener('touchstart', function (e) {
+      e.preventDefault();
+      el.classList.add('press');
+      onDown();
+    }, { passive: false });
+    if (onUp) {
+      const up = function (e) {
+        e.preventDefault();
+        el.classList.remove('press');
+        onUp();
+      };
+      el.addEventListener('touchend', up, { passive: false });
+      el.addEventListener('touchcancel', up, { passive: false });
+    }
+  }
+  bindBtn('bFire', function () {
+    if (state !== 'play') return;
+    const w = WEAPONS[player.w];
+    if (w.auto) firing = true;
+    else playerShoot();
+  }, function () { firing = false; });
+  bindBtn('bReload', function () { if (state === 'play') startReload(); });
+  bindBtn('bBuy', function () { if (state === 'play') toggleMenu(); });
+  bindBtn('bMap', function () {
+    if (state !== 'play') return;
+    minimapOn = !minimapOn;
+    if (!minimapOn) mm.clearRect(0, 0, 132, 132);
+  });
+  bindBtn('bPause', function () { if (state === 'play') pauseGame(); });
+
+  // --- slots de arma (1-5) tocáveis ---
+  const slotsEl = $('slots');
+  slotsEl.style.pointerEvents = 'auto';
+  for (let i = 1; i <= 5; i++) {
+    (function (n) {
+      const el = $('s' + n);
+      el.addEventListener('touchstart', function (e) {
+        e.preventDefault();
+        if (state !== 'play' || menuOpen) return;
+        const k = SLOTS[n - 1];
+        if (player.owned[k]) switchWeapon(k); else Sfx.empty();
+      }, { passive: false });
+    })(i);
+  }
+}
+
+
 requestAnimationFrame(loop);
 
 // gancho de depuração para testes automatizados (não afeta a jogabilidade)

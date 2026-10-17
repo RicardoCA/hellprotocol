@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>Hell Protocol</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -41,6 +42,23 @@
   .keys { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 16px auto; width: max-content; text-align: left; font-size: 14px; }
   .keys b { color: #8fe6a0; font-family: Consolas, monospace; }
   button.big { pointer-events: auto; cursor: pointer; margin-top: 14px; padding: 12px 44px; font-size: 18px; letter-spacing: 2px; color: #06130a; background: linear-gradient(180deg,#8cf08c,#3fae5a); border: 0; border-radius: 6px; font-weight: 700; }
+  .fine { margin-top: 14px; font-size: 11px; color: #7a9a7e; }
+  /* ---------- controles móveis ---------- */
+  #mcontrols { position: absolute; inset: 0; pointer-events: none; display: none; touch-action: none; }
+  #mcontrols.on { display: block; }
+  #stickZone { position: absolute; left: 18px; bottom: 18px; width: 150px; height: 150px; pointer-events: auto; touch-action: none; }
+  #stickBase { position: absolute; left: 0; top: 0; width: 150px; height: 150px; border: 2px solid rgba(120,255,140,.35); border-radius: 50%; background: rgba(10,20,12,.35); }
+  #stickKnob { position: absolute; left: 50%; top: 50%; width: 62px; height: 62px; transform: translate(-50%, -50%); border-radius: 50%; background: rgba(120,255,140,.28); border: 2px solid rgba(120,255,140,.6); box-shadow: 0 0 10px rgba(60,220,90,.35); }
+  #lookZone { position: absolute; left: 0; top: 0; right: 0; bottom: 0; pointer-events: auto; touch-action: none; }
+  .mbtn { position: absolute; pointer-events: auto; touch-action: manipulation; border-radius: 50%; border: 2px solid rgba(120,255,140,.5); background: rgba(10,25,14,.55); color: #bff0c6; font-family: Consolas, monospace; font-size: 13px; font-weight: 700; letter-spacing: 1px; text-shadow: 0 1px 2px #000; user-select: none; -webkit-user-select: none; }
+  .mbtn:active, .mbtn.press { background: rgba(80,220,110,.4); color: #fff; }
+  #bFire  { right: 22px;  bottom: 84px; width: 88px; height: 88px; font-size: 15px; }
+  #bReload{ right: 124px; bottom: 30px;  width: 60px; height: 60px; }
+  #bBuy   { right: 22px;  bottom: 30px;  width: 60px; height: 60px; }
+  #bMap   { right: 22px;  top: 156px;    width: 54px; height: 54px; }
+  #bPause { right: 22px;  top: 96px;     width: 54px; height: 54px; }
+  body.mobile #stage { width: 100vw; height: 100dvh; transform: none; top: 0; }
+  body.mobile #game { height: 100%; border-radius: 0; border: 0; }
   button.big:hover { filter: brightness(1.1); }
   .fine { margin-top: 14px; font-size: 11px; color: #7a9a7e; }
   .maps { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
@@ -148,6 +166,23 @@
       <p class="bhint">[1-6] comprar · [B] fechar · os inimigos só entram em ação quando o tempo de compra acabar</p>
     </div>
   </div>
+      <p class="bhint">[1-6] comprar · [B] fechar · os inimigos só entram em ação quando o tempo de compra acabar</p>
+    </div>
+  </div>
+
+  <div id="mcontrols" class="hidden">
+    <div id="lookZone"></div>
+    <div id="stickZone">
+      <div id="stickBase"></div>
+      <div id="stickKnob"></div>
+    </div>
+    <button class="mbtn" id="bFire">FOGO</button>
+    <button class="mbtn" id="bReload">REC</button>
+    <button class="mbtn" id="bBuy">COMPRA</button>
+    <button class="mbtn" id="bMap">MAPA</button>
+    <button class="mbtn" id="bPause">PAUSA</button>
+  </div>
+</div>
 </div>
 
 <script src="audio.js"></script>
