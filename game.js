@@ -870,7 +870,15 @@ function goMenu() {
   pauseOv.classList.add('hidden');
   hideConfirmBack();
   $('best').textContent = best > 0 ? 'Recorde: ' + best + ' rodada(s) vencida(s)' : '';
+  showMenuScreen('mode');
   menuOv.classList.remove('hidden');
+}
+// ---------- telas do menu principal (modo / single / multiplayer) ----------
+function showMenuScreen(which) {
+  $('modeSelect').classList.toggle('hidden', which !== 'mode');
+  $('singleMenu').classList.toggle('hidden', which !== 'single');
+  $('mpMenu').classList.toggle('hidden', which !== 'mp');
+  if (which === 'mp') $('mpMsg').textContent = '';
 }
 function resumeClick() {
   if (isMobile) { resumeNow(); return; }
@@ -890,6 +898,27 @@ $('pbackNo').addEventListener('click', function (e) {
 $('pbackYes').addEventListener('click', function (e) {
   e.stopPropagation();
   goMenu();
+});
+
+// ---------- navegação do menu (modos) ----------
+$('btnSingle').addEventListener('click', function () {
+  showMenuScreen('single');
+});
+$('btnMulti').addEventListener('click', function () {
+  showMenuScreen('mp');
+});
+$('backMode1').addEventListener('click', function () {
+  showMenuScreen('mode');
+});
+$('backMode2').addEventListener('click', function () {
+  showMenuScreen('mode');
+});
+// multiplayer: funcionalidade real ainda não implementada — apenas estrutura visual
+$('mpHost').addEventListener('click', function () {
+  $('mpMsg').textContent = 'Servidores multiplayer chegam em breve.';
+});
+$('mpBrowse').addEventListener('click', function () {
+  $('mpMsg').textContent = 'Servidores multiplayer chegam em breve.';
 });
 
 $('play').addEventListener('click', function () {
