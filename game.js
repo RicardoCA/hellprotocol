@@ -9,13 +9,15 @@ let botSpawns = [], pickupsSpots = [];
 let PLAYER_SPAWN = [12.5, 21.5];
 let mapName = 'DEPÓSITO';
 let selectedMap = 1;
+let scenery = [];
+const scenerySolid = new Set();
 // 1 = tijolo, 2 = concreto, 3 = caixote, 4 = reboco, 5 = metal
 function buildMap(id) {
   const m = new Uint8Array(MW * MH);
   const R = function (x, y, w, h, t) { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) m[j * MW + i] = t; };
   for (let i = 0; i < MW; i++) { m[i] = 1; m[(MH - 1) * MW + i] = 1; }
   for (let j = 0; j < MH; j++) { m[j * MW] = 1; m[j * MW + MW - 1] = 1; }
-  const info = { map: m, botSpawns: [], pickups: [], playerSpawn: [12.5, 21.5], name: '' };
+  const info = { map: m, botSpawns: [], pickups: [], playerSpawn: [12.5, 21.5], name: '', scenery: [] };
   if (id === 2) {
     info.name = 'PÁTIO';
     R(5, 3, 2, 2, 2); R(9, 2, 6, 1, 5); R(17, 4, 2, 2, 3); R(20, 8, 2, 2, 2);
@@ -23,6 +25,14 @@ function buildMap(id) {
     R(9, 15, 3, 2, 2); R(16, 17, 4, 1, 5); R(2, 17, 3, 1, 3); R(11, 20, 4, 1, 2);
     info.botSpawns = [[21.5, 2.5], [7.5, 4.5], [2.5, 12.5], [21.5, 12.5], [2.5, 21.5], [21.5, 21.5], [16.5, 7.5], [2.5, 5.5], [12.5, 13.5]];
     info.pickups = [[7.5, 20.5, 'health'], [18.5, 6.5, 'health'], [7.5, 7.5, 'armor'], [19.5, 14.5, 'armor'], [2.5, 10.5, 'ammo'], [21.5, 17.5, 'ammo'], [12.5, 12.5, 'ammo']];
+    // cenário: caminhões e carros estacionados (colisão sólida)
+    info.scenery = [
+      { x: 5.5, y: 20.5, k: 'truck', scale: 1.15, vMove: 14, solid: true },
+      { x: 15.5, y: 20.5, k: 'car', scale: 0.95, vMove: 32, solid: true },
+      { x: 18.5, y: 20.5, k: 'car', scale: 0.95, vMove: 32, solid: true },
+      { x: 8.5, y: 5.5, k: 'truck', scale: 1.15, vMove: 14, solid: true },
+      { x: 3.5, y: 5.5, k: 'car', scale: 0.95, vMove: 32, solid: true }
+    ];
   } else if (id === 3) {
     info.name = 'SILO';
     info.playerSpawn = [7.5, 21.5];
@@ -77,6 +87,12 @@ function applyMap(id) {
   const info = buildMap(id);
   map = info.map;
   botSpawns = info.botSpawns;
+  scenery = info.scenery || [];
+  // células ocupadas por veículos ficam sólidas (colisão com o cenário)
+  scenerySolid.clear();
+  for (const s of scenery) {
+    if (s.solid) scenerySolid.add((s.y | 0) * MW + (s.x | 0));
+  }
   if (Engine.setFloorCeil && Tex.floors && Tex.ceils) {
     Engine.setFloorCeil(Tex.floors[id] || Tex.floor, Tex.ceils[id] || Tex.ceil);
   }
@@ -144,6 +160,7 @@ function solidBox(x, y, r) {
   for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) {
     if (i < 0 || j < 0 || i >= MW || j >= MH) return true;
     if (map[j * MW + i] > 0) return true;
+    if (scenerySolid.has(j * MW + i)) return true;
   }
   return false;
 }
@@ -542,6 +559,10 @@ function updateBot(b, dt) {
 // ---------- lista de sprites para o motor ----------
 function spriteList(t) {
   const out = [];
+  // cenário estático (veículos, caixotes grandes) — sempre atrás dos bots no z-buffer automático do motor
+  for (const s of scenery) {
+    out.push({ x: s.x, y: s.y, tex: Tex.scenery[s.k], scale: s.scale, vMove: s.vMove });
+  }
   for (const b of bots) {
     if (!b.alive) {
       if (b.deathT < 0.28) out.push({ x: b.x, y: b.y, tex: Tex.bot[5], scale: 0.72, vMove: 56 });
@@ -952,8 +973,8 @@ function loop(ts) {
 }
 
 // ---------- inicialização ----------
-applyMap(selectedMap);
 Engine.setTextures({ walls: Tex.walls, floor: Tex.floor, ceil: Tex.ceil });
+applyMap(selectedMap); // aplica o tema de chão/teto do mapa escolhido
 pickups = buildPickups();
 BUY_LIST.forEach(function (item, i) {
   const row = document.createElement('div');

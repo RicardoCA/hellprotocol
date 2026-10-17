@@ -454,6 +454,111 @@ const Tex = (function () {
     g.fillStyle = '#1e2c36'; g.fillRect(28, 22, 8, 5);
     return finish(c);
   }
+  // ---------- cenário: veículos (128x128, billboard com transparência) ----------
+  function truck() {
+    const c = cnv(128, 128), g = c.getContext('2d'), r = rng(91);
+    g.fillStyle = '#3d5c3f';
+    g.fillRect(88, 52, 30, 34);
+    g.fillStyle = '#2c442e'; g.fillRect(88, 52, 30, 6);
+    g.fillStyle = '#9fc4d8'; g.fillRect(91, 60, 24, 12);
+    g.fillStyle = '#6f93a8'; g.fillRect(91, 70, 24, 2);
+    g.fillStyle = '#46654a';
+    g.fillRect(14, 56, 74, 30);
+    g.fillStyle = '#365038'; g.fillRect(14, 56, 74, 5);
+    g.fillStyle = '#557757';
+    g.fillRect(14, 62, 74, 2);
+    g.fillRect(88, 62, 30, 2);
+    g.fillStyle = '#1e2620'; g.fillRect(88, 84, 30, 6);
+    g.fillStyle = '#e8e4c0'; g.fillRect(90, 78, 6, 5); g.fillRect(110, 78, 6, 5);
+    g.fillStyle = '#14171a';
+    g.fillRect(24, 86, 18, 14); g.fillRect(94, 86, 18, 14);
+    g.fillStyle = '#2c3033';
+    g.fillRect(27, 89, 12, 8); g.fillRect(97, 89, 12, 8);
+    for (let i = 0; i < 40; i++) {
+      g.fillStyle = 'rgba(30,40,30,' + (0.1 + r() * 0.15) + ')';
+      g.fillRect(14 + r() * 104, 52 + r() * 46, 3, 2);
+    }
+    return finish(c);
+  }
+  function car() {
+    const c = cnv(128, 128), g = c.getContext('2d'), r = rng(92);
+    g.fillStyle = '#a8352f';
+    g.fillRect(30, 58, 74, 28);
+    g.fillStyle = '#c14a42';
+    g.fillRect(30, 54, 34, 6);
+    g.fillStyle = '#8c2c26'; g.fillRect(30, 82, 74, 6);
+    g.fillStyle = '#b03a32';
+    g.fillRect(56, 44, 34, 16);
+    g.fillStyle = '#a8c8dc';
+    g.fillRect(59, 47, 28, 11);
+    g.fillStyle = '#7fa3ba'; g.fillRect(59, 55, 28, 3);
+    g.fillStyle = '#efe9c8'; g.fillRect(100, 62, 5, 6);
+    g.fillStyle = '#c0392b'; g.fillRect(29, 62, 5, 6);
+    g.fillStyle = '#14171a';
+    g.fillRect(38, 84, 16, 14); g.fillRect(80, 84, 16, 14);
+    g.fillStyle = '#33383c';
+    g.fillRect(41, 87, 10, 8); g.fillRect(83, 87, 10, 8);
+    g.fillStyle = 'rgba(255,255,255,0.18)';
+    g.fillRect(30, 58, 74, 3);
+    for (let i = 0; i < 24; i++) {
+      g.fillStyle = 'rgba(60,20,18,' + (0.08 + r() * 0.12) + ')';
+      g.fillRect(30 + r() * 74, 54 + r() * 34, 2, 2);
+    }
+    return finish(c);
+  }
+  function openSky() {
+    const c = cnv(64, 64), g = c.getContext('2d');
+    const grd = g.createLinearGradient(0, 0, 0, 64);
+    grd.addColorStop(0, '#7db8e8'); grd.addColorStop(1, '#d4ecf7');
+    g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
+    g.fillStyle = 'rgba(255,255,255,0.85)';
+    const clouds = [[10, 14], [34, 8], [52, 20], [22, 34], [44, 42]];
+    for (let i = 0; i < clouds.length; i++) {
+      const cx = clouds[i][0], cy = clouds[i][1];
+      g.beginPath(); g.ellipse(cx, cy, 12, 5, 0, 0, 6.283); g.fill();
+      g.beginPath(); g.ellipse(cx + 7, cy - 3, 7, 4, 0, 0, 6.283); g.fill();
+      g.beginPath(); g.ellipse(cx - 7, cy - 2, 6, 3.4, 0, 0, 6.283); g.fill();
+    }
+    g.fillStyle = 'rgba(255,249,220,0.95)';
+    g.beginPath(); g.arc(56, 10, 4.5, 0, 6.283); g.fill();
+    g.fillStyle = 'rgba(255,249,220,0.35)';
+    g.beginPath(); g.arc(56, 10, 8, 0, 6.283); g.fill();
+    return finish(c);
+  }
+  function beachFloor() {
+    const c = cnv(64, 64), g = c.getContext('2d'), r = rng(93);
+    g.fillStyle = '#dbc9a0'; g.fillRect(0, 0, 64, 64);
+    for (let i = 0; i < 300; i++) {
+      const v = (r() * 22 - 11) | 0;
+      g.fillStyle = 'rgba(' + (219 + v) + ',' + (201 + v) + ',' + (160 + v) + ',0.55)';
+      g.fillRect((r() * 64) | 0, (r() * 64) | 0, 2, 2);
+    }
+    const grd = g.createLinearGradient(0, 30, 0, 64);
+    grd.addColorStop(0, '#3fb6c9'); grd.addColorStop(1, '#1f7fa8');
+    g.fillStyle = grd;
+    g.beginPath();
+    g.moveTo(0, 40);
+    g.bezierCurveTo(18, 34, 40, 46, 64, 38);
+    g.lineTo(64, 64); g.lineTo(0, 64);
+    g.closePath(); g.fill();
+    g.strokeStyle = 'rgba(240,250,255,0.75)'; g.lineWidth = 2;
+    g.beginPath();
+    g.moveTo(0, 40);
+    g.bezierCurveTo(18, 34, 40, 46, 64, 38);
+    g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,0.25)'; g.lineWidth = 1;
+    for (let i = 0; i < 3; i++) {
+      const y = 46 + i * 6;
+      g.beginPath(); g.moveTo(6 + r() * 8, y);
+      g.bezierCurveTo(24, y - 2, 40, y + 2, 58, y);
+      g.stroke();
+    }
+    for (let i = 0; i < 6; i++) {
+      g.fillStyle = 'rgba(250,240,220,' + (0.5 + r() * 0.3) + ')';
+      g.beginPath(); g.arc(r() * 60 + 2, 8 + r() * 24, 1.2 + r() * 1.4, 0, 6.283); g.fill();
+    }
+    return finish(c);
+  }
   function bloodTex() {
     const c = cnv(20, 20), g = c.getContext('2d');
     g.fillStyle = 'rgba(150,18,18,0.95)';
@@ -764,8 +869,9 @@ const Tex = (function () {
     walls: [null, brick(7), concrete(11), crate(23), plaster(41), metal(67)],
     floor: floorTex(),
     ceil: ceilTex(),
-    floors: { 1: floorTex(), 2: patioFloor(), 3: siloFloor(), 4: sandFloor(), 5: sandFloor2(), 6: forjaFloor() },
-    ceils: { 1: ceilTex(), 2: patioCeil(), 3: siloCeil(), 4: sandCeil(), 5: sunsetCeil(), 6: forjaCeil() },
+    floors: { 1: floorTex(), 2: patioFloor(), 3: siloFloor(), 4: sandFloor(), 5: beachFloor(), 6: forjaFloor() },
+    ceils: { 1: ceilTex(), 2: openSky(), 3: siloCeil(), 4: sandCeil(), 5: sunsetCeil(), 6: forjaCeil() },
+    scenery: { truck: truck(), car: car() },
     bot: [soldier(0), soldier(1), soldier(2), soldier(3), soldier(4), soldier(5), soldier(6)],
     pickups: { health: medkit(), ammo: ammoBox(), armor: vest() },
     blood: bloodTex(),

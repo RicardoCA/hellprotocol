@@ -152,5 +152,5 @@ const Engine = (function () {
     ctx2.drawImage(cv, 0, 0, w, h);
   }
 
-  return { render: render, blit: blit, setMap: setMap, setTextures: setTextures, RW: RW, RH: RH, debug: false, _dbg: null };
+  return { render: render, blit: blit, setMap: setMap, setTextures: setTextures, setFloorCeil: setFloorCeil, RW: RW, RH: RH, debug: false, _dbg: null };
 })();
