@@ -788,6 +788,17 @@ window.addEventListener('mouseup', function (e) { if (e.button === 0) firing = f
 canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
 function lockPointer() { if (canvas.requestPointerLock) canvas.requestPointerLock(); }
+function tryFullscreenLandscape() {
+  // melhor experiência no celular: tela cheia + trava de orientação (quando suportado)
+  try {
+    const root = document.documentElement;
+    if (!root.requestFullscreen || document.fullscreenElement) return;
+    const p = root.requestFullscreen();
+    if (p && p.then) p.then(function () {
+      try { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(function () {}); } catch (e) {}
+    }).catch(function () {});
+  } catch (e) {}
+}
 function pauseGame() {
   if (state !== 'play') return;
   state = 'pause'; firing = false;
@@ -806,7 +817,8 @@ $('play').addEventListener('click', function () {
   Sfx.unlock();
   menuOv.classList.add('hidden');
   startRound(1);
-  if (!isMobile) lockPointer();
+  if (isMobile) tryFullscreenLandscape();
+  else lockPointer();
 });
 
 // ---------- seleção de mapa ----------
@@ -1016,6 +1028,14 @@ function initMobileControls() {
       }, { passive: false });
     })(i);
   }
+
+  // girar para retrato pausa o combate (o aviso de rotação aparece via CSS)
+  const portraitMq = window.matchMedia('(orientation: portrait)');
+  const onOrient = function () {
+    if (portraitMq.matches && state === 'play' && !menuOpen) pauseGame();
+  };
+  if (portraitMq.addEventListener) portraitMq.addEventListener('change', onOrient);
+  else if (portraitMq.addListener) portraitMq.addListener(onOrient);
 }
 if (isMobile) {
   initMobileControls();

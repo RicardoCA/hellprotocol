@@ -46,20 +46,28 @@
   /* ---------- controles móveis ---------- */
   #mcontrols { position: absolute; inset: 0; pointer-events: none; display: none; touch-action: none; z-index: 2; }
   body.mobile #mcontrols { display: block; }
-  #stickZone { position: absolute; left: 12px; bottom: 12px; width: 132px; height: 132px; pointer-events: auto; touch-action: none; }
-  #stickBase { position: absolute; left: 0; top: 0; width: 132px; height: 132px; border: 2px solid rgba(120,255,140,.35); border-radius: 50%; background: rgba(10,20,12,.35); }
-  #stickKnob { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; transform: translate(-50%, -50%); border-radius: 50%; background: rgba(120,255,140,.28); border: 2px solid rgba(120,255,140,.6); box-shadow: 0 0 10px rgba(60,220,90,.35); }
+  #stickZone { position: absolute; left: 14px; bottom: 14px; width: clamp(112px, 36vmin, 158px); height: clamp(112px, 36vmin, 158px); pointer-events: auto; touch-action: none; }
+  #stickBase { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border: 2px solid rgba(120,255,140,.35); border-radius: 50%; background: rgba(10,20,12,.35); }
+  #stickKnob { position: absolute; left: 50%; top: 50%; width: clamp(48px, 14vmin, 62px); height: clamp(48px, 14vmin, 62px); transform: translate(-50%, -50%); border-radius: 50%; background: rgba(120,255,140,.28); border: 2px solid rgba(120,255,140,.6); box-shadow: 0 0 10px rgba(60,220,90,.35); }
   #lookZone { position: absolute; inset: 0; pointer-events: auto; touch-action: none; }
-  .mbtn { position: absolute; pointer-events: auto; touch-action: manipulation; border-radius: 50%; border: 2px solid rgba(120,255,140,.5); background: rgba(10,25,14,.55); color: #bff0c6; font-family: Consolas, monospace; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-shadow: 0 1px 2px #000; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+  .mbtn { position: absolute; pointer-events: auto; touch-action: manipulation; border-radius: 50%; border: 2px solid rgba(120,255,140,.5); background: rgba(10,25,14,.55); color: #bff0c6; font-family: Consolas, monospace; font-size: clamp(11px, 2.8vmin, 14px); font-weight: 700; letter-spacing: 1px; text-shadow: 0 1px 2px #000; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
   .mbtn:active, .mbtn.press { background: rgba(80,220,110,.4); color: #fff; }
-  #bFire  { right: 12px;  bottom: 12px; width: 88px; height: 88px; font-size: 15px; }
-  #bReload{ right: 114px; bottom: 12px; width: 60px; height: 60px; }
-  #bBuy   { right: 114px; bottom: 80px; width: 60px; height: 60px; }
-  #bPause { right: 12px;  top: 112px;   width: 48px; height: 48px; }
-  #bMap   { right: 12px;  top: 168px;   width: 48px; height: 48px; }
+  #bFire  { right: 14px; bottom: 14px; width: clamp(78px, 24vmin, 100px); height: clamp(78px, 24vmin, 100px); font-size: clamp(13px, 3.4vmin, 16px); }
+  #bReload{ right: 128px; bottom: 14px; width: clamp(54px, 16vmin, 66px); height: clamp(54px, 16vmin, 66px); }
+  #bBuy   { right: 128px; bottom: 86px; width: clamp(54px, 16vmin, 66px); height: clamp(54px, 16vmin, 66px); }
+  #bPause { right: 14px; top: 112px; width: clamp(46px, 13vmin, 56px); height: clamp(46px, 13vmin, 56px); }
+  #bMap   { right: 14px; top: 172px; width: clamp(46px, 13vmin, 56px); height: clamp(46px, 13vmin, 56px); }
+  @supports (padding: max(0px, env(safe-area-inset-bottom))) {
+    #stickZone { left: calc(14px + env(safe-area-inset-left)); bottom: calc(14px + env(safe-area-inset-bottom)); }
+    #bFire  { right: calc(14px + env(safe-area-inset-right)); bottom: calc(14px + env(safe-area-inset-bottom)); }
+    #bReload { right: calc(128px + env(safe-area-inset-right)); }
+    #bBuy   { right: calc(128px + env(safe-area-inset-right)); bottom: calc(86px + env(safe-area-inset-bottom)); }
+    #bPause { right: calc(14px + env(safe-area-inset-right)); }
+    #bMap   { right: calc(14px + env(safe-area-inset-right)); }
+  }
   /* modo celular: tela cheia mantendo a proporção 960x600 e HUD reorganizado */
-  body.mobile { overflow: hidden; }
-  body.mobile #stage { width: 100vw; height: 100vh; height: 100dvh; display: flex; align-items: center; justify-content: center; }
+  body.mobile { overflow: hidden; position: fixed; inset: 0; overscroll-behavior: none; }
+  body.mobile #stage { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; transform: none; display: flex; align-items: center; justify-content: center; }
   body.mobile #game { width: min(100vw, 160vh); height: min(62.5vw, 100vh); border-radius: 0; border: 0; }
   @supports (width: 100dvh) {
     body.mobile #game { width: min(100vw, 160dvh); height: min(62.5vw, 100dvh); }
@@ -74,8 +82,9 @@
   body.mobile #slots { right: auto; left: 176px; bottom: 14px; text-align: left; }
   body.mobile #minimap { width: 96px; height: 96px; }
   #bclose { pointer-events: auto; cursor: pointer; margin-top: 12px; padding: 10px 34px; font-size: 15px; letter-spacing: 2px; color: #06130a; background: linear-gradient(180deg,#8cf08c,#3fae5a); border: 0; border-radius: 6px; font-weight: 700; }
-  .mrotate { display: none; margin-top: 10px; font-size: 13px; color: #ffe27a; }
-  @media (pointer: coarse) and (orientation: portrait) { .mrotate { display: block; } }
+  #rotate { z-index: 40; }
+  #rotate .panel h1 { font-size: 26px; color: #ffe27a; }
+  @media (pointer: coarse) and (orientation: portrait) { body.mobile #rotate { display: flex !important; } }
   @media (max-width: 760px) {
     #feed { width: 82%; font-size: 11px; }
     #top { font-size: 10px; }
@@ -169,7 +178,6 @@
       </div>
       <p id="menulvl"></p>
       <p id="best"></p>
-      <p class="mrotate">📱 Vire o celular na horizontal para jogar melhor.</p>
       <button class="big" id="play">JOGAR</button>
       <p class="fine">Código, artes e sons 100% originais gerados por código — nenhum asset ou código de terceiros. Funciona offline: basta abrir este index.html.</p>
     </div>
@@ -183,6 +191,13 @@
     </div>
   </div>
 
+  <div id="rotate" class="overlay hidden">
+    <div class="panel">
+      <h1>VIRE O CELULAR</h1>
+      <p>Este jogo roda na horizontal — gire o dispositivo para continuar.</p>
+    </div>
+  </div>
+
   <div id="buymenu" class="hidden">
     <div id="buypanel">
       <h2>MENU DE COMPRA</h2>
@@ -190,9 +205,6 @@
       <div id="buyitems"></div>
       <div id="buymsg"></div>
       <button id="bclose">FECHAR</button>
-      <p class="bhint">[1-6] comprar · [B] fechar · os inimigos só entram em ação quando o tempo de compra acabar</p>
-    </div>
-  </div>
       <p class="bhint">[1-6] comprar · [B] fechar · os inimigos só entram em ação quando o tempo de compra acabar</p>
     </div>
   </div>
@@ -209,7 +221,6 @@
     <button class="mbtn" id="bMap">MAPA</button>
     <button class="mbtn" id="bPause">PAUSA</button>
   </div>
-</div>
 </div>
 
 <script src="audio.js"></script>
