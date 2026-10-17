@@ -805,13 +805,40 @@ function pauseGame() {
   for (const k in keys) keys[k] = false;
   pauseOv.classList.remove('hidden');
 }
-function resumeNow() { state = 'play'; pauseOv.classList.add('hidden'); }
+function resumeNow() { state = 'play'; pauseOv.classList.add('hidden'); hideConfirmBack(); }
+function hideConfirmBack() {
+  $('confirmBack').classList.add('hidden');
+  $('pback').classList.remove('hidden');
+}
+function goMenu() {
+  if (menuOpen) { menuOpen = false; $('buymenu').classList.add('hidden'); }
+  state = 'menu';
+  firing = false;
+  for (const k in keys) keys[k] = false;
+  pauseOv.classList.add('hidden');
+  hideConfirmBack();
+  $('best').textContent = best > 0 ? 'Recorde: ' + best + ' rodada(s) vencida(s)' : '';
+  menuOv.classList.remove('hidden');
+}
 function resumeClick() {
   if (isMobile) { resumeNow(); return; }
   lockPointer();
   setTimeout(function () { if (!locked && state === 'pause') resumeNow(); }, 350);
 }
 pauseOv.addEventListener('click', resumeClick);
+$('pback').addEventListener('click', function (e) {
+  e.stopPropagation(); // não deixa o clique no fundo da pausa retomar o jogo
+  $('pback').classList.add('hidden');
+  $('confirmBack').classList.remove('hidden');
+});
+$('pbackNo').addEventListener('click', function (e) {
+  e.stopPropagation();
+  hideConfirmBack();
+});
+$('pbackYes').addEventListener('click', function (e) {
+  e.stopPropagation();
+  goMenu();
+});
 
 $('play').addEventListener('click', function () {
   Sfx.unlock();
