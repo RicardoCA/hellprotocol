@@ -47,6 +47,14 @@
   /* opções do menu principal: só texto, verde, empilhadas */
   .modeopt { display: block; width: max-content; margin: 12px auto 0; pointer-events: auto; cursor: pointer; background: none; border: 0; padding: 4px 12px; font-family: inherit; font-size: 22px; font-weight: 700; letter-spacing: 3px; color: #4fd26a; text-transform: uppercase; transition: color .12s; }
   .modeopt:hover { color: #ffffff; }
+  .modeopt2 { display: block; width: max-content; margin: 6px auto 0; pointer-events: auto; cursor: pointer; background: none; border: 0; padding: 3px 10px; font-family: inherit; font-size: 15px; font-weight: 700; letter-spacing: 2px; color: #4fd26a; text-transform: uppercase; transition: color .12s; }
+  .modeopt2:hover { color: #ffffff; }
+  .codebox { display: block; width: 100%; max-width: 520px; margin: 6px auto 0; pointer-events: auto; background: rgba(10,18,14,.8); border: 1px solid #3a5a42; border-radius: 4px; color: #bfe8c4; font-family: Consolas, monospace; font-size: 10px; padding: 6px; resize: vertical; height: 54px; }
+  .mkeys2 { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 10px auto 0; width: max-content; text-align: left; font-size: 12px; }
+  #mpServers { max-height: 180px; overflow-y: auto; margin-top: 8px; }
+  .srvrow { display: flex; justify-content: space-between; align-items: center; max-width: 460px; margin: 4px auto; padding: 6px 12px; background: rgba(30,44,54,.55); border: 1px solid #3a5a42; border-radius: 4px; font-size: 13px; color: #bfe8c4; }
+  .srvjoin { pointer-events: auto; cursor: pointer; background: none; border: 0; color: #4fd26a; font-family: inherit; font-size: 13px; font-weight: 700; letter-spacing: 1px; transition: color .12s; }
+  .srvjoin:hover { color: #ffffff; }
   /* ---------- controles móveis ---------- */
   #mcontrols { position: absolute; inset: 0; pointer-events: none; display: none; touch-action: none; z-index: 2; }
   body.mobile #mcontrols { display: block; }
@@ -232,13 +240,56 @@
         <button class="modeopt" id="play">Jogar</button>
         <button class="modeopt" id="backMode1">Voltar</button>
       </div>
-      <!-- tela 2b: multiplayer (estrutura visual — funcionalidade em breve) -->
+      <!-- tela 2b: multiplayer LAN (WebRTC P2P, sem backend) -->
       <div id="mpMenu" class="hidden">
-        <p>Jogue contra outros jogadores em servidores online.</p>
-        <button class="modeopt" id="mpHost">Host</button>
-        <button class="modeopt" id="mpBrowse">Browse Servers</button>
-        <p id="mpMsg" class="finemode"></p>
-        <button class="modeopt" id="backMode2">Voltar</button>
+        <div id="mpHome">
+          <p>Modo LAN — jogue com outras pessoas na sua rede local.</p>
+          <button class="modeopt" id="mpHost">Host</button>
+          <button class="modeopt" id="mpBrowse">Browse Servers</button>
+          <p id="mpMsg" class="finemode"></p>
+        </div>
+        <div id="mpHostView" class="hidden">
+          <p class="finemode">Escolha o mapa do servidor:</p>
+          <select id="mpMapSel" class="mapsel">
+            <option value="1" selected>MAPA: DEPÓSITO</option>
+            <option value="2">MAPA: PÁTIO</option>
+            <option value="3">MAPA: SILO</option>
+            <option value="4">MAPA: DUNAS</option>
+            <option value="5">MAPA: OÁSIS</option>
+            <option value="6">MAPA: FORJA</option>
+          </select>
+          <button class="modeopt" id="mpStart">Iniciar Servidor</button>
+          <div id="mpLobby" class="hidden">
+            <p id="mpStatus" class="finemode">Servidor no ar — aguardando jogadores…</p>
+            <div class="keys mkeys2">
+              <b>Convite</b><span>envie o código abaixo ao convidado</span>
+            </div>
+            <textarea id="mpInvite" class="codebox" readonly></textarea>
+            <button class="modeopt2" id="mpCopy">Copiar convite</button>
+            <div class="keys mkeys2">
+              <b>Resposta</b><span>cole aqui o código de resposta do convidado</span>
+            </div>
+            <textarea id="mpAnswer" class="codebox" placeholder="cole o código aqui…"></textarea>
+            <button class="modeopt2" id="mpAccept">Conectar convidado</button>
+            <button class="modeopt" id="mpGo">Iniciar Partida</button>
+          </div>
+          <button class="modeopt" id="mpHostBack">Voltar</button>
+        </div>
+        <div id="mpBrowseView" class="hidden">
+          <p class="finemode">Servidores locais em execução:</p>
+          <div id="mpServers"></div>
+          <div class="keys mkeys2">
+            <b>Convidado</b><span>se o host não aparecer, junte-se por código</span>
+          </div>
+          <textarea id="mpHostCode" class="codebox" placeholder="cole o código de convite do host…"></textarea>
+          <button class="modeopt2" id="mpJoinCode">Entrar por código</button>
+          <div id="mpAnswerBox" class="hidden">
+            <p class="finemode">Envie ao host o código de resposta:</p>
+            <textarea id="mpOutCode" class="codebox" readonly></textarea>
+            <button class="modeopt2" id="mpCopyOut">Copiar resposta</button>
+          </div>
+          <button class="modeopt" id="mpBrowseBack">Voltar</button>
+        </div>
       </div>
     </div>
   </div>
@@ -292,6 +343,7 @@
 <script src="audio.js"></script>
 <script src="textures.js"></script>
 <script src="engine.js"></script>
+<script src="net.js"></script>
 <script src="game.js"></script>
 </body>
 </html>

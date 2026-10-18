@@ -563,6 +563,15 @@ function spriteList(t) {
   for (const s of scenery) {
     out.push({ x: s.x, y: s.y, tex: Tex.scenery[s.k], scale: s.scale, vMove: s.vMove });
   }
+  // jogadores remotos (multiplayer) — desenhados como soldados
+  if (mpOn) {
+    for (const id in mpRemote) {
+      const r = mpRemote[id];
+      if (r.hp <= 0) continue;
+      const frame = r.m ? Tex.bot[(t * 6 | 0) % 4] : Tex.bot[0];
+      out.push({ x: r.x, y: r.y, tex: frame, scale: 0.82, vMove: 36 });
+    }
+  }
   for (const b of bots) {
     if (!b.alive) {
       if (b.deathT < 0.28) out.push({ x: b.x, y: b.y, tex: Tex.bot[5], scale: 0.72, vMove: 56 });
@@ -900,7 +909,95 @@ $('pbackYes').addEventListener('click', function (e) {
   goMenu();
 });
 
-// ---------- navegação do menu (modos) ----------
+// ---------- multiplayer LAN (WebRTC P2P — host autoritativo) ----------
+let mpOn = false;                    // modo multiplayer ativo
+let mpRole = 'off';                  // 'off' | 'host' | 'guest'
+let mpReady = false;                 // partida multiplayer em execução
+const mpRemote = {};                 // id -> { x, y, a, hp, name, lastT }
+let mpName = 'Jogador';
+let mpTimer = 0;
+
+function mpConnectNet() {
+  if (typeof Net === 'undefined') { $('mpMsg').textContent = 'Módulo de rede não carregado.'; return false; }
+  Net.onMsg(function (d, from) { mpOnMsg(d, from); });
+  Net.onPeers(function (list) { mpUpdatePeers(list); });
+  Net.onLobby(function (list) { mpRenderServers(list); });
+  return true;
+}
+function mpUpdatePeers(list) {
+  // convidado: quando o canal abre, apresenta-se e aguarda o host iniciar a partida
+  if (mpRole === 'guest' && !mpOn && list.length > 0) {
+    mpOn = true;
+    Net.send({ t: 'hi', n: mpName });
+    $('mpMsg').textContent = 'Conectado! Aguardando o host iniciar a partida…';
+  }
+  if (!mpOn) return;
+  for (const id in mpRemote) {
+    if (list.indexOf(id) < 0) delete mpRemote[id];
+  }
+  if (mpRole === 'host') $('mpStatus').textContent = list.length === 0
+    ? 'Servidor no ar — aguardando jogadores…'
+    : 'Servidor no ar — ' + (list.length + 1) + ' jogador(es) conectado(s)';
+}
+// ---------- sincronização ----------
+function mpOnMsg(d, from) {
+  if (d.t === 'hi') {
+    if (!mpOn) return;
+    mpRemote[from] = { x: 12.5, y: 21.5, a: 0, hp: 100, name: d.n || 'Jogador' };
+    if (mpRole === 'host') {
+      // informa ao convidado o estado atual do mundo
+      Net.send({ t: 'world', map: selectedMap, round: round, phase: state });
+      addFeed(d.n + ' entrou no servidor');
+    }
+    return;
+  }
+  if (d.t === 'p' && mpOn && mpRemote[from]) {
+    const r = mpRemote[from];
+    r.x = d.x; r.y = d.y; r.a = d.a; r.m = d.m; r.hp = d.hp;
+    if (d.s) mpRemoteShoot(r);
+    return;
+  }
+  if (d.t === 'world' && mpRole === 'guest') {
+    selectedMap = d.map;
+    if (d.phase === 'play' && state === 'menu') mpGuestStart(d.round);
+    return;
+  }
+  if (d.t === 'start' && mpRole === 'guest') {
+    selectedMap = d.map || selectedMap;
+    if (!mpReady) mpGuestStart(d.round);
+    return;
+  }
+  if (d.t === 'bots' && mpRole === 'guest' && mpOn) {
+    mpSyncBots(d.b);
+    return;
+  }
+}
+function mpRemoteShoot(r) {
+  // feedback visual/sonoro do tiro do outro jogador
+  Sfx.pistol();
+}
+function mpSyncBots(list) {
+  // substitui o estado local dos bots pelo do host
+  if (!list) return;
+  for (let i = 0; i < bots.length && i < list.length; i++) {
+    const s = list[i], b = bots[i];
+    b.x = s.x; b.y = s.y; b.a = s.a; b.hp = s.hp; b.alive = s.al; b.ft = s.f;
+  }
+}
+function mpTick(dt) {
+  if (!mpOn || !mpReady) return;
+  mpTimer += dt;
+  if (mpTimer < 0.1) return; // 10 Hz
+  mpTimer = 0;
+  if (mpRole === 'host') {
+    const list = [];
+    for (const b of bots) list.push({ x: +b.x.toFixed(2), y: +b.y.toFixed(2), a: +b.a.toFixed(2), hp: b.hp, al: b.alive, f: +(b.ft % 100).toFixed(2) });
+    Net.send({ t: 'bots', b: list });
+  } else {
+    Net.send({ t: 'p', x: +player.x.toFixed(2), y: +player.y.toFixed(2), a: +player.a.toFixed(2), m: player.moving ? 1 : 0, hp: player.hp, s: player.cool > WEAPONS[player.w].rate * 0.7 });
+  }
+}
+
 $('btnSingle').addEventListener('click', function () {
   showMenuScreen('single');
 });
@@ -910,16 +1007,128 @@ $('btnMulti').addEventListener('click', function () {
 $('backMode1').addEventListener('click', function () {
   showMenuScreen('mode');
 });
-$('backMode2').addEventListener('click', function () {
-  showMenuScreen('mode');
-});
-// multiplayer: funcionalidade real ainda não implementada — apenas estrutura visual
+// ---------- navegação do menu multiplayer LAN ----------
+function mpShow(screen) {
+  $('mpHome').classList.toggle('hidden', screen !== 'home');
+  $('mpHostView').classList.toggle('hidden', screen !== 'host');
+  $('mpBrowseView').classList.toggle('hidden', screen !== 'browse');
+  if (screen === 'browse') mpListenServers();
+}
+function mpListenServers() {
+  mpConnectNet();
+  mpRenderServers(Net.lobby);
+}
+function mpRenderServers(list) {
+  if (!list || !$('mpServers')) return;
+  const el = $('mpServers');
+  el.innerHTML = '';
+  if (list.length === 0) {
+    const d = document.createElement('div');
+    d.className = 'finemode';
+    d.textContent = 'Nenhum servidor encontrado nesta aba/navegador — junte-se por código para jogar entre aparelhos.';
+    el.appendChild(d);
+    return;
+  }
+  for (const s of list) {
+    const row = document.createElement('div');
+    row.className = 'srvrow';
+    const info = document.createElement('span');
+    info.textContent = s.name + ' — ' + s.players + ' jogador(es)';
+    const btn = document.createElement('button');
+    btn.className = 'srvjoin';
+    btn.textContent = 'Entrar';
+    btn.addEventListener('click', function () {
+      Net.joinLobbyServer(s.id);
+      mpRole = 'guest'; // papel definido já na entrada
+      $('mpMsg').textContent = 'Conectando ao ' + s.name + '…';
+    });
+    row.appendChild(info);
+    row.appendChild(btn);
+    el.appendChild(row);
+  }
+}
 $('mpHost').addEventListener('click', function () {
-  $('mpMsg').textContent = 'Servidores multiplayer chegam em breve.';
+  if (!mpConnectNet()) return;
+  mpRole = 'host';
+  mpShow('host');
 });
 $('mpBrowse').addEventListener('click', function () {
-  $('mpMsg').textContent = 'Servidores multiplayer chegam em breve.';
+  mpShow('browse');
 });
+$('mpStart').addEventListener('click', function () {
+  if (!mpConnectNet()) return;
+  const res = Net.host('Servidor de ' + mpName);
+  if (!res.ok) { $('mpStatus').textContent = res.err; $('mpLobby').classList.remove('hidden'); return; }
+  mpOn = true;
+  mpRole = 'host';
+  mpReady = false; // servidor no ar, mas a partida só começa no "Iniciar Partida"
+  $('mpLobby').classList.remove('hidden');
+  $('mpStatus').textContent = 'Servidor no ar — aguardando jogadores…';
+  Net.hostCreateInvite().then(function (code) {
+    $('mpInvite').value = code;
+  }).catch(function (e) {
+    $('mpStatus').textContent = 'Erro ao gerar convite: ' + e.message;
+  });
+});
+$('mpGo').addEventListener('click', function () {
+  if (!mpReady) {
+    mpReady = true;
+    menuOv.classList.add('hidden');
+    startRound(1);
+    if (!isMobile) lockPointer();
+    // avisa todos os convidados para iniciar a mesma partida
+    Net.send({ t: 'start', map: selectedMap, round: 1 });
+  }
+});
+$('mpCopy').addEventListener('click', function () {
+  const ta = $('mpInvite');
+  ta.select();
+  try { document.execCommand('copy'); } catch (e) {}
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).catch(function () {});
+  $('mpStatus').textContent = 'Convite copiado — envie ao convidado.';
+});
+$('mpAccept').addEventListener('click', function () {
+  const code = $('mpAnswer').value.trim();
+  if (!code) { $('mpStatus').textContent = 'Cole o código de resposta do convidado.'; return; }
+  Net.hostAcceptAnswer(code);
+  $('mpStatus').textContent = 'Conectando convidado…';
+});
+$('mpHostBack').addEventListener('click', function () {
+  if (mpOn && mpRole === 'host' && !mpReady) { Net.stop(); mpOn = false; mpRole = 'off'; }
+  mpShow('home');
+});
+$('mpJoinCode').addEventListener('click', function () {
+  const code = $('mpHostCode').value.trim();
+  if (!code) { $('mpMsg').textContent = 'Cole o código de convite do host.'; return; }
+  mpConnectNet();
+  mpRole = 'guest'; // papel definido já na entrada — permite processar world/start do host
+  Net.joinByCode(code).then(function (answer) {
+    $('mpOutCode').value = answer;
+    $('mpAnswerBox').classList.remove('hidden');
+    $('mpMsg').textContent = 'Envie o código de resposta ao host.';
+  }).catch(function (e) {
+    $('mpMsg').textContent = 'Erro: ' + e.message;
+  });
+});
+$('mpCopyOut').addEventListener('click', function () {
+  const ta = $('mpOutCode');
+  ta.select();
+  try { document.execCommand('copy'); } catch (e) {}
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).catch(function () {});
+  $('mpMsg').textContent = 'Resposta copiada — envie ao host.';
+});
+$('mpBrowseBack').addEventListener('click', function () {
+  mpShow('home');
+});
+// convidado inicia a partida quando o host sinaliza
+function mpGuestStart(r) {
+  mpOn = true;
+  mpRole = 'guest';
+  menuOv.classList.add('hidden');
+  startRound(r || 1);
+  mpReady = true;
+}
+
 
 $('play').addEventListener('click', function () {
   Sfx.unlock();
@@ -957,6 +1166,7 @@ function loop(ts) {
   }
   if (state === 'play') {
     movePlayer(dt);
+    mpTick(dt);
     if (buyTime > 0 && !menuOpen) {
       buyTime -= dt;
       if (buyTime <= 0) { buyTime = 0; spawnPendingBots(); }
