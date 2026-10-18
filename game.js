@@ -380,13 +380,23 @@ function playerShoot() {
       parts.push({ x: player.x + Math.cos(ang) * res.wall, y: player.y + Math.sin(ang) * res.wall, life: 0.35, max: 0.35, s: 0.16, tex: 'dust', v: 80 });
     }
   }
-  for (const idStr in dmgMap) {
-    const id = +idStr;
-    for (let i = 0; i < bots.length; i++) {
-      if (bots[i].id === id && bots[i].alive) {
-        const crit = Math.random() < 0.15;
-        damageBot(bots[i], Math.round(dmgMap[idStr] * (crit ? 1.5 : 1)), crit);
-        break;
+  if (mpRole === 'guest') {
+    // autoridade do host: o dano do convidado é reportado ao host
+    // (a cópia local dos bots é sobrescrita pelo sync a cada 0,1s)
+    if (Object.keys(dmgMap).length > 0) {
+      Net.send({ t: 'shot', d: dmgMap, x: +player.x.toFixed(2), y: +player.y.toFixed(2), n: w.noise });
+      cross.classList.add('hit'); hitT = 0.12;
+      Sfx.hit();
+    }
+  } else {
+    for (const idStr in dmgMap) {
+      const id = +idStr;
+      for (let i = 0; i < bots.length; i++) {
+        if (bots[i].id === id && bots[i].alive) {
+          const crit = Math.random() < 0.15;
+          damageBot(bots[i], Math.round(dmgMap[idStr] * (crit ? 1.5 : 1)), crit);
+          break;
+        }
       }
     }
   }
@@ -426,9 +436,25 @@ function hurtPlayer(dmg) {
 }
 function die() {
   state = 'dead'; deadT = 0; firing = false;
+  if (mpOn) {
+    // avisa o outro player para que a rodada só reinicie quando ambos terminarem
+    Net.send({ t: 'death' });
+    // se o outro player já terminou, dispara o reinício sincronizado agora
+    if (mpPeerDone) mpFinishRound();
+  }
   Sfx.lose();
-  showBanner('VOCÊ MORREU', 'Reiniciando a rodada ' + round + '…');
+  showBanner('VOCÊ MORREU', mpOn && !mpPeerDone ? 'Aguardando o outro jogador concluir a rodada…' : 'Reiniciando a rodada ' + round + '…');
   awardRoundXp(false);
+}
+// reinício sincronizado: reinicia a rodada local e força o peer a fazer o mesmo
+function mpFinishRound() {
+  if (state === 'dead') {
+    Net.send({ t: 'syncRound', round: round });
+    startRound(round);
+  } else if (state === 'win') {
+    Net.send({ t: 'syncRound', round: round + 1 });
+    startRound(round + 1);
+  }
 }
 
 // ---------- pickups ----------
@@ -639,6 +665,9 @@ function updateXpPanel(dt) {
 // ---------- rodadas ----------
 function startRound(r) {
   round = r;
+  // nova rodada: reseta os flags de sincronização multiplayer
+  mpPeerDone = false;
+  mpDoneSent = false;
   applyMap(selectedMap);
   pendingCount = Math.min(4 + (r - 1) * 2, 12);
   bots = []; botsSpawned = false;
@@ -673,6 +702,11 @@ function spawnPendingBots() {
 }
 function roundWinFn() {
   state = 'win'; winT = 0;
+  if (mpOn) {
+    // notifica o peer imediatamente ao concluir a rodada
+    mpDoneSent = true;
+    Net.send({ t: 'win' });
+  }
   Sfx.win();
   money = Math.min(99999, money + 1000);
   addFeed('+$1000 — rodada vencida');
@@ -873,6 +907,9 @@ function hideConfirmBack() {
 }
 function goMenu() {
   if (menuOpen) { menuOpen = false; $('buymenu').classList.add('hidden'); }
+  // desconecta do multiplayer ao voltar ao menu principal
+  // (permite que host/convidado joguem singleplayer depois)
+  mpDisconnect();
   state = 'menu';
   firing = false;
   for (const k in keys) keys[k] = false;
@@ -914,8 +951,28 @@ let mpOn = false;                    // modo multiplayer ativo
 let mpRole = 'off';                  // 'off' | 'host' | 'guest'
 let mpReady = false;                 // partida multiplayer em execução
 const mpRemote = {};                 // id -> { x, y, a, hp, name, lastT }
+let mpPeerDone = false;              // outro player morreu/concluiu a rodada
+let mpDoneSent = false;              // já avisei o peer que concluí/morri nesta rodada
 let mpName = 'Jogador';
 let mpTimer = 0;
+// desconecta e reseta todo o estado multiplayer (chamado ao voltar ao menu)
+function mpDisconnect() {
+  if (!mpOn) return;
+  // avisa o peer antes de fechar: convidado avisa o host, host avisa os convidados
+  if (mpRole === 'guest') {
+    Net.send({ t: 'left' });
+  } else if (mpRole === 'host') {
+    Net.send({ t: 'server_closed' });
+  }
+  try { Net.stop(); } catch (e) {}
+  mpOn = false;
+  mpRole = 'off';
+  mpReady = false;
+  mpPeerDone = false;
+  mpDoneSent = false;
+  mpTimer = 0;
+  for (const id in mpRemote) delete mpRemote[id];
+}
 
 function mpConnectNet() {
   if (typeof Net === 'undefined') { $('mpMsg').textContent = 'Módulo de rede não carregado.'; return false; }
@@ -951,8 +1008,8 @@ function mpOnMsg(d, from) {
     }
     return;
   }
-  if (d.t === 'p' && mpOn && mpRemote[from]) {
-    const r = mpRemote[from];
+  if (d.t === 'p' && mpOn) {
+    const r = mpRemote[from] || (mpRemote[from] = { x: d.x, y: d.y, a: d.a, hp: d.hp, name: 'Jogador' });
     r.x = d.x; r.y = d.y; r.a = d.a; r.m = d.m; r.hp = d.hp;
     if (d.s) mpRemoteShoot(r);
     return;
@@ -965,6 +1022,78 @@ function mpOnMsg(d, from) {
   if (d.t === 'start' && mpRole === 'guest') {
     selectedMap = d.map || selectedMap;
     if (!mpReady) mpGuestStart(d.round);
+    return;
+  }
+  if (d.t === 'left') {
+    // um convidado saiu para o menu — remove apenas ele do servidor
+    const nm = (mpRemote[from] || {}).name || 'Jogador';
+    delete mpRemote[from];
+    if (mpRole === 'host') addFeed(nm + ' saiu do servidor');
+    return;
+  }
+  if (d.t === 'server_closed') {
+    // o host fechou o servidor — todos os convidados voltam ao menu
+    mpDisconnect();
+    if (state !== 'menu') {
+      state = 'menu';
+      menuOv.classList.remove('hidden');
+      showMenuScreen('mode');
+    }
+    return;
+  }
+  if (d.t === 'death') {
+    // o outro player morreu: aguardamos o syncRound dele para reiniciar juntos
+    mpPeerDone = true;
+    return;
+  }
+  if (d.t === 'win') {
+    // o outro player concluiu a rodada (matou todos os bots)
+    mpPeerDone = true;
+    if (state === 'play') {
+      // convidado ainda jogando: força a entrada no estado de vitória
+      roundWinFn();
+    } else if (state === 'dead' || state === 'win') {
+      mpFinishRound();
+    }
+    return;
+  }
+  if (d.t === 'syncRound' && mpOn) {
+    // o peer reiniciou a rodada e está me forçando a sincronizar com ele
+    if (state !== 'play' || round !== d.round) startRound(d.round);
+    return;
+  }
+  if (d.t === 'shot' && mpRole === 'host') {
+    // autoridade do host: aplica o dano acertado pelo convidado
+    for (const idStr in d.d) {
+      const id = +idStr;
+      for (const b of bots) {
+        if (b.id === id && b.alive) {
+          const crit = Math.random() < 0.15;
+          const dmg = Math.round(d.d[idStr] * (crit ? 1.5 : 1));
+          if (b.hp - dmg <= 0) {
+            // abate do convidado — host não recebe a recompensa
+            b.hp -= dmg; b.flash = 0.12; b.alert = true; b.lastSeen = 0; b.alive = false;
+            Net.send({ t: 'kill', id: b.id });
+          } else {
+            damageBot(b, dmg, crit);
+          }
+          break;
+        }
+      }
+    }
+    // ruído do tiro do convidado alerta os bots perto dele
+    for (const b of bots) {
+      if (!b.alive) continue;
+      if (Math.hypot(b.x - d.x, b.y - d.y) < d.n) { b.alert = true; b.lastSeen = 0; }
+    }
+    return;
+  }
+  if (d.t === 'kill' && mpRole === 'guest') {
+    // crédito do abate vai para o convidado
+    kills++; roundKills++;
+    money = Math.min(99999, money + 300);
+    Sfx.kill();
+    addFeed('Bot-' + d.id + ' eliminado (+$300)');
     return;
   }
   if (d.t === 'bots' && mpRole === 'guest' && mpOn) {
@@ -993,6 +1122,8 @@ function mpTick(dt) {
     const list = [];
     for (const b of bots) list.push({ x: +b.x.toFixed(2), y: +b.y.toFixed(2), a: +b.a.toFixed(2), hp: b.hp, al: b.alive, f: +(b.ft % 100).toFixed(2) });
     Net.send({ t: 'bots', b: list });
+    // host também envia a própria posição — sem isso o convidado não o vê
+    Net.send({ t: 'p', x: +player.x.toFixed(2), y: +player.y.toFixed(2), a: +player.a.toFixed(2), m: player.moving ? 1 : 0, hp: player.hp, s: player.cool > WEAPONS[player.w].rate * 0.7 });
   } else {
     Net.send({ t: 'p', x: +player.x.toFixed(2), y: +player.y.toFixed(2), a: +player.a.toFixed(2), m: player.moving ? 1 : 0, hp: player.hp, s: player.cool > WEAPONS[player.w].rate * 0.7 });
   }
@@ -1190,10 +1321,23 @@ function loop(ts) {
     checkPickups();
   } else if (state === 'win') {
     updateXpPanel(dt);
+    if (mpOn) {
+      // avisa o outro player (uma única vez) que concluí a rodada
+      if (!mpPeerDone && !mpDoneSent) { mpDoneSent = true; Net.send({ t: 'win' }); }
+      // se o outro player já terminou, dispara o reinício sincronizado agora
+      if (mpPeerDone) { mpFinishRound(); return; }
+      // senão aguarda o outro player concluir ou morrer
+      return Engine.render(player.x, player.y, player.a, spriteList(t));
+    }
     winT += dt;
     if (winT > 3.2) startRound(round + 1);
   } else if (state === 'dead') {
     updateXpPanel(dt);
+    if (mpOn) {
+      // multiplayer: o reinício é sempre sincronizado via syncRound do peer
+      // (evita divergência de rounds entre host e convidado)
+      return Engine.render(player.x, player.y, player.a, spriteList(t));
+    }
     deadT += dt;
     if (deadT > 3.2) startRound(round);
   }
