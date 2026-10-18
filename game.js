@@ -955,6 +955,7 @@ let mpPeerDone = false;              // outro player morreu/concluiu a rodada
 let mpDoneSent = false;              // já avisei o peer que concluí/morri nesta rodada
 let mpName = 'Jogador';
 let mpTimer = 0;
+const mpBrokerStates = {};           // diagnóstico: estado de cada sinalizador
 // desconecta e reseta todo o estado multiplayer (chamado ao voltar ao menu)
 function mpDisconnect() {
   if (!mpOn) return;
@@ -993,6 +994,14 @@ function mpConnectNet() {
     // progresso da conexão da sala: host vê no status, convidado no msg
     if (mpRole === 'host') $('mpStatus').textContent = txt;
     else if (mpRole === 'guest') mpGuestMsg(txt);
+  });
+  Net.onBroker(function (name, state) {
+    // diagnóstico ao vivo: estado de cada sinalizador (mostrado na tela de entrada)
+    mpBrokerStates[name] = state;
+    if (mpRole !== 'guest') return;
+    const parts = Object.keys(mpBrokerStates).map(function (n) { return n + ': ' + mpBrokerStates[n]; });
+    const el = $('mpBrokers');
+    if (el) el.textContent = parts.join(' · ');
   });
   return true;
 }
@@ -1247,6 +1256,9 @@ $('mpJoinRoom').addEventListener('click', function () {
   if (!/^\d{6}$/.test(code)) { mpGuestMsg('Digite o código de 6 dígitos da sala.'); return; }
   mpConnectNet();
   mpRole = 'guest'; // papel definido já na entrada — permite processar world/start do host
+  for (const k in mpBrokerStates) delete mpBrokerStates[k]; // zera o diagnóstico da tentativa
+  const bs = $('mpBrokers');
+  if (bs) bs.textContent = 'conectando aos sinalizadores…';
   mpGuestMsg('Entrando na sala ' + code + '…');
   Net.joinRoom(code).then(function () {
     mpGuestMsg('Sala encontrada — conectando ao host…');
@@ -1535,7 +1547,7 @@ if (isMobile) {
 requestAnimationFrame(loop);
 
 // marca de build — permite conferir (console do PC / telas do multiplayer) se o navegador carregou ESTE arquivo
-const OT_BUILD = 'v6 — progresso visível na entrada da sala';
+const OT_BUILD = 'v7 — diagnóstico de sinalização ao vivo';
 console.log('[Operação Tática] game.js build ' + OT_BUILD);
 const mpVersionEl = $('mpVersion');
 if (mpVersionEl) mpVersionEl.textContent = 'build ' + OT_BUILD;

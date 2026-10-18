@@ -29,6 +29,9 @@ let roomHandler = null;     // roteador (tópico, payload) da sala
 let roomReconn = {};        // idx -> timer de reconexão
 let offerPubT = {};         // gid -> ts da última publicação da oferta (evita spam no retry)
 let roomRetryT = null;      // host: re-envia a oferta para quem ainda não respondeu
+let joinTentativas = 0;     // convidado: quantas tentativas de entrada foram enviadas
+let hostJoins = 0;          // host: quantas tentativas de entrada chegaram pela sinalização
+let onBroker = null;        // callback de estado por sinalizador (diagnóstico na UI)
 let onStage = null;         // callback de progresso da conexão (mostrado na UI)
 // fecha todas as conexões de sinalização abertas
 function roomCloseConns() {
@@ -81,11 +84,20 @@ function listenLobby() {
 }
 
 // ---------- MQTT minimalista (protocolo 3.1.1 sobre WebSocket, implementado aqui) ----------
+// wss:// funciona em qualquer página; ws:// só em páginas HTTP/arquivo (em HTTPS o
+// navegador bloqueia conteúdo misto) — por isso filtramos pela origem da página
 const BROKERS = [
-  'wss://broker.emqx.io:8084/mqtt',      // EMQX público
-  'wss://broker.hivemq.com:8884/mqtt',   // HiveMQ público
-  'wss://test.mosquitto.org:8081/mqtt'   // Mosquitto test
-];
+  'wss://broker.emqx.io:8084/mqtt',      // EMQX público (TLS)
+  'wss://broker.hivemq.com:8884/mqtt',   // HiveMQ público (TLS)
+  'wss://test.mosquitto.org:8081/mqtt',  // Mosquitto test (TLS)
+  'ws://broker.emqx.io:8083/mqtt',       // EMQX público (texto puro)
+  'ws://broker.hivemq.com:8000',         // HiveMQ público (texto puro)
+  'ws://test.mosquitto.org:8080'         // Mosquitto test (texto puro)
+].filter(function (url) {
+  if (typeof location === 'undefined') return true;
+  if (location.protocol === 'https:') return url.indexOf('wss://') === 0;
+  return true; // http:// e file:// aceitam ws:// e wss://
+});
 function concatBytes() {
   let n = 0;
   for (const a of arguments) n += a.length;
@@ -186,12 +198,22 @@ function mqttConnect(broker, clientId, onPublish, onClose) {
 function mqttConnectAll() {
   const base = Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36);
   const attempts = BROKERS.map(function (b, idx) {
+    if (onBroker) onBroker(brokerName(b), 'conectando…');
     return mqttConnect(b, 'hp' + base + idx, function (t, p) {
       console.log('[sala] <-', brokerName(b), t);
       roomOnPublish(t, p);
-    }, function () { roomConnDropped(idx); })
-      .then(function (m) { return { m: m, broker: b, idx: idx }; })
-      .catch(function () { return null; });
+    }, function () {
+      if (onBroker) onBroker(brokerName(b), 'caiu — reconectando…');
+      roomConnDropped(idx);
+    })
+      .then(function (m) {
+        if (onBroker) onBroker(brokerName(b), 'conectado');
+        return { m: m, broker: b, idx: idx };
+      })
+      .catch(function () {
+        if (onBroker) onBroker(brokerName(b), 'falhou');
+        return null;
+      });
   });
   return Promise.all(attempts).then(function (list) {
     const conns = list.filter(Boolean);
@@ -212,16 +234,21 @@ function roomConnDropped(idx) {
   const ep = roomEpoch;
   roomConns = roomConns.filter(function (c) { return c.idx !== idx; });
   if (!room || roomReconn[idx]) return;
+  if (onBroker) onBroker(brokerName(BROKERS[idx]), 'reconectando…');
   roomReconn[idx] = setTimeout(function () {
     delete roomReconn[idx];
     if (ep !== roomEpoch || !room) return;
     mqttConnect(BROKERS[idx], 'hpr' + Date.now().toString(36) + idx, roomOnPublish, function () { roomConnDropped(idx); })
       .then(function (m) {
         if (ep !== roomEpoch || !room) { try { m.close(); } catch (e) {} return; }
+        if (onBroker) onBroker(brokerName(BROKERS[idx]), 'conectado');
         roomConns.push({ m: m, broker: BROKERS[idx], idx: idx });
         roomSubscribeAll(m);
         if (onStage) onStage('Sinalização reconectada (' + brokerName(BROKERS[idx]) + ')');
-      }).catch(function () { roomConnDropped(idx); });
+      }).catch(function () {
+        if (onBroker) onBroker(brokerName(BROKERS[idx]), 'falhou');
+        roomConnDropped(idx);
+      });
   }, 3000);
 }
 function brokerName(url) { return String(url).split('/')[2]; }
@@ -248,13 +275,21 @@ function hostRoom() {
   roomCloseConns();
   const ep = ++roomEpoch;
   offerPubT = {};
+  hostJoins = 0;
   room = String(Math.floor(100000 + Math.random() * 900000));
   if (onStage) onStage('Conectando ao servidor de sinalização…');
   roomHandler = function (topic, payload) {
     let d = null;
     if (topic === topicJoin()) {
       try { d = JSON.parse(payload); } catch (e) { return; }
-      if (d && d.id) { console.log('[sala] convidado pediu entrada:', d.id); hostRoomAccept(d.id); }
+      if (d && d.id) {
+        hostJoins++;
+        console.log('[sala] convidado pediu entrada:', d.id, '(tentativas recebidas:', hostJoins + ')');
+        if (hostJoins === 1 || hostJoins % 5 === 0) {
+          if (onStage) onStage('Tentativas de entrada recebidas pela sinalização: ' + hostJoins + ' — negociando…');
+        }
+        hostRoomAccept(d.id);
+      }
     } else if (topic.indexOf('hp/' + room + '/a/') === 0) {
       try { d = JSON.parse(payload); } catch (e) { return; }
       if (d && d.a) { console.log('[sala] resposta recebida de', topic); hostRoomAnswer(topic.slice(('hp/' + room + '/a/').length), d.a); }
@@ -336,6 +371,7 @@ function joinRoom(code) {
   role = 'guest';
   roomCloseConns();
   const ep = ++roomEpoch;
+  joinTentativas = 0;
   if (onStage) onStage('Conectando ao servidor de sinalização…');
   return new Promise(function (resolve, reject) {
     let joined = false, retryT = null, giveT = null, waited = 0;
@@ -380,8 +416,8 @@ function joinRoom(code) {
     const attempt = function () {
       if (ep !== roomEpoch) { clearInterval(retryT); return; } // tentativa cancelada — para de publicar
       waited += 2.5;
-      if (waited % 10 === 0 && onStage) onStage('Ainda procurando a sala ' + room + '… (' + waited + 's) — os dois lados continuam tentando');
-      if (roomConns.length && !joined) roomPublish(topicJoin(), JSON.stringify({ id: myId }));
+      if (roomConns.length && !joined) { joinTentativas++; roomPublish(topicJoin(), JSON.stringify({ id: myId })); }
+      if (waited % 10 === 0 && onStage) onStage('Ainda procurando a sala ' + room + '… (' + waited + 's) — tentativas enviadas: ' + joinTentativas);
     };
     const connectPhase = function () {
       if (ep !== roomEpoch) return;
@@ -408,7 +444,11 @@ function joinRoom(code) {
     giveT = setTimeout(function () {
       clearInterval(retryT);
       if (ep !== roomEpoch) return; // tentativa já foi cancelada — não rejeita
-      reject(new Error('O host não respondeu em 30s — confira o código e tente de novo (os sinalizadores oscilam).'));
+      const vivos = roomConns.length;
+      reject(new Error('O host não respondeu em 30s — sinalizadores conectados neste aparelho: ' + vivos + '/' + BROKERS.length +
+        (vivos === 0 ? ' (NENHUM — verifique a internet do celular)' : '') +
+        ' · tentativas de entrada enviadas: ' + joinTentativas +
+        '. Confira o código e tente de novo.'));
     }, 30000);
   });
 }
@@ -508,6 +548,8 @@ window.Net = {
     const out = {
       room: room,
       brokers: roomConns.map(function (c) { return brokerName(c.broker); }),
+      joinTentativas: joinTentativas,
+      hostJoins: hostJoins,
       peers: []
     };
     for (const id in rtcPeers) {
@@ -518,6 +560,8 @@ window.Net = {
   },
   // progresso da conexão (o jogo mostra na tela)
   onStage: function (cb) { onStage = cb; },
+  // estado por sinalizador (diagnóstico ao vivo na tela de entrada)
+  onBroker: function (cb) { onBroker = cb; },
   onMsg: function (cb) { onMsg = cb; },
   onPeers: function (cb) { onPeers = cb; },
   onLobby: function (cb) { onLobby = cb; },

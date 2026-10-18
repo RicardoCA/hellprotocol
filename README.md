@@ -6,7 +6,7 @@ Jogo de tiro tático em primeira pessoa que roda **direto no navegador**, sem in
 
 0. **Jogue online (GitHub Pages):** https://ricardoca.github.io/hellprotocol/
 1. Dê um **duplo clique em `index.html`** (abre no navegador padrão). Ou, se preferir, sirva a pasta:
-   - `python -m http.server 8000` e acesse `http://localhost:8000/hellprotocol/`
+   - `python servidor.py` e acesse `http://localhost:8000/hellprotocol/` — **use este servidor para o multiplayer**: ele desativa o cache, garantindo que o PC e o celular executem sempre a versão mais recente.
 2. Clique em **JOGAR** (isso também ativa o mouse-lock para mirar).
 
 ### Controles no celular
