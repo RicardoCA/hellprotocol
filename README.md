@@ -41,4 +41,4 @@ No celular os controles aparecem automaticamente durante o combate (jogue na **h
 - `node dev-test-map.js` — flood-fill: confere que todos os spawns e pickups são alcançáveis nos 3 mapas.
 - `node dev-smoke.js` — simula o jogo por ~80s: menu de compra (debitar/preencher), pausa de spawn com menu aberto, combate com recompensa (fuzil e escopeta), bônus de rodada, **XP/nível com persistência (F5 simulado)**, morte/retry e maratona sem exceções.
 
-O jogo expõe `window.__OT` (estado, spriteList, mapInfo) e `Engine.debug` apenas como ganchos de depuração para esses testes — podem ser ignorados em uso normal.
+O jogo expõe `window.__OT` (estado, spriteList, mapInfo) e `Engine.debug` apenas como ganchos de depuração para esses testes — podem ser ignorados em uso normal. A build atual aparece no console do navegador (`game.js build vN`) e no menu Multiplayer — confira se **ambos os aparelhos** estão na mesma build antes de testar.

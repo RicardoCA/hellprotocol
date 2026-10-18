@@ -449,10 +449,10 @@ function die() {
 // reinício sincronizado: reinicia a rodada local e força o peer a fazer o mesmo
 function mpFinishRound() {
   if (state === 'dead') {
-    Net.send({ t: 'syncRound', round: round });
+    Net.send({ t: 'syncRound', round: round, map: selectedMap });
     startRound(round);
   } else if (state === 'win') {
-    Net.send({ t: 'syncRound', round: round + 1 });
+    Net.send({ t: 'syncRound', round: round + 1, map: selectedMap });
     startRound(round + 1);
   }
 }
@@ -972,6 +972,8 @@ function mpDisconnect() {
   mpDoneSent = false;
   mpTimer = 0;
   for (const id in mpRemote) delete mpRemote[id];
+  const mpMapSelEl = $('mpMapSel');
+  if (mpMapSelEl) mpMapSelEl.disabled = false; // libera a escolha de mapa para a próxima partida
 }
 
 function mpConnectNet() {
@@ -1059,6 +1061,7 @@ function mpOnMsg(d, from) {
   }
   if (d.t === 'syncRound' && mpOn) {
     // o peer reiniciou a rodada e está me forçando a sincronizar com ele
+    if (d.map) selectedMap = d.map; // garante estar no mesmo mapa do host
     if (state !== 'play' || round !== d.round) startRound(d.round);
     return;
   }
@@ -1188,6 +1191,7 @@ $('mpBrowse').addEventListener('click', function () {
 });
 $('mpStart').addEventListener('click', function () {
   if (!mpConnectNet()) return;
+  selectMap(+$('mpMapSel').value || 1); // o servidor sobe no mapa escolhido no dropdown do host
   const res = Net.host('Servidor de ' + mpName);
   if (!res.ok) { $('mpStatus').textContent = res.err; $('mpLobby').classList.remove('hidden'); return; }
   mpOn = true;
@@ -1204,6 +1208,7 @@ $('mpStart').addEventListener('click', function () {
 $('mpGo').addEventListener('click', function () {
   if (!mpReady) {
     mpReady = true;
+    $('mpMapSel').disabled = true; // mapa travado durante a partida (evita dessincronizar as rodadas)
     menuOv.classList.add('hidden');
     startRound(1);
     if (!isMobile) lockPointer();
@@ -1225,7 +1230,7 @@ $('mpAccept').addEventListener('click', function () {
   $('mpStatus').textContent = 'Conectando convidado…';
 });
 $('mpHostBack').addEventListener('click', function () {
-  if (mpOn && mpRole === 'host' && !mpReady) { Net.stop(); mpOn = false; mpRole = 'off'; }
+  if (mpOn && mpRole === 'host' && !mpReady) { Net.stop(); mpOn = false; mpRole = 'off'; $('mpMapSel').disabled = false; }
   mpShow('home');
 });
 $('mpJoinCode').addEventListener('click', function () {
@@ -1269,14 +1274,21 @@ $('play').addEventListener('click', function () {
   else lockPointer();
 });
 
-// ---------- seleção de mapa (dropdown único) ----------
+// ---------- seleção de mapa (dropdowns sincronizados: singleplayer e host) ----------
 function selectMap(id) {
   selectedMap = id;
   const ms = $('mapSel');
   if (ms) ms.value = String(id);
+  const mms = $('mpMapSel');
+  if (mms) mms.value = String(id);
 }
 $('mapSel').addEventListener('change', function () {
   const v = +$('mapSel').value;
+  if (v >= 1) selectMap(v);
+});
+// o dropdown da tela de host também define o mapa do servidor
+$('mpMapSel').addEventListener('change', function () {
+  const v = +$('mpMapSel').value;
   if (v >= 1) selectMap(v);
 });
 selectMap(1);
@@ -1512,6 +1524,12 @@ if (isMobile) {
 
 
 requestAnimationFrame(loop);
+
+// marca de build — permite conferir (console do PC / tela de multiplayer) se o navegador carregou ESTE arquivo
+const OT_BUILD = 'v3 — mapa do servidor do host corrigido';
+console.log('[Operação Tática] game.js build ' + OT_BUILD);
+const mpVersionEl = $('mpVersion');
+if (mpVersionEl) mpVersionEl.textContent = 'build ' + OT_BUILD;
 
 // gancho de depuração para testes automatizados (não afeta a jogabilidade)
 window.__OT = {

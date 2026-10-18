@@ -24,6 +24,12 @@ function peers() {
   for (const id in rtcPeers) if (rtcPeers[id].open) out.push(id);
   return out;
 }
+function lobbyList() {
+  // servidores descobertos via BroadcastChannel (tela "Browse Servers")
+  const out = [];
+  for (const id in lobbyPeers) out.push({ id: id, name: lobbyPeers[id].name, players: lobbyPeers[id].players });
+  return out;
+}
 function broadcastLobby() {
   if (role !== 'host' || !bc) return;
   const info = { kind: 'lobby', id: myId, name: serverName, players: peers().length + 1, t: Date.now() };
