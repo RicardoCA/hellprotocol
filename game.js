@@ -981,6 +981,11 @@ function mpConnectNet() {
   Net.onMsg(function (d, from) { mpOnMsg(d, from); });
   Net.onPeers(function (list) { mpUpdatePeers(list); });
   Net.onLobby(function (list) { mpRenderServers(list); });
+  Net.onStage(function (txt) {
+    // progresso da conexão da sala: host vê no status, convidado no msg
+    if (mpRole === 'host') $('mpStatus').textContent = txt;
+    else if (mpRole === 'guest') $('mpMsg').textContent = txt;
+  });
   return true;
 }
 function mpUpdatePeers(list) {
@@ -1190,6 +1195,7 @@ $('mpBrowse').addEventListener('click', function () {
   mpShow('browse');
 });
 $('mpStart').addEventListener('click', function () {
+  if (mpOn) return; // servidor já no ar — não reabre a sala
   if (!mpConnectNet()) return;
   selectMap(+$('mpMapSel').value || 1); // o servidor sobe no mapa escolhido no dropdown do host
   const res = Net.host('Servidor de ' + mpName);
@@ -1237,7 +1243,7 @@ $('mpJoinRoom').addEventListener('click', function () {
   Net.joinRoom(code).then(function () {
     $('mpMsg').textContent = 'Sala encontrada — conectando ao host…';
   }).catch(function (e) {
-    $('mpMsg').textContent = 'Erro: ' + e.message;
+    if (mpRole === 'guest') $('mpMsg').textContent = 'Erro: ' + e.message; // só mostra se ainda estiver aguardando
   });
 });
 $('mpRoomInput').addEventListener('input', function () {
@@ -1247,6 +1253,8 @@ $('mpRoomInput').addEventListener('keydown', function (e) {
   if (e.key === 'Enter') { e.preventDefault(); $('mpJoinRoom').click(); }
 });
 $('mpBrowseBack').addEventListener('click', function () {
+  // se o convidado estava aguardando a sala, cancela a tentativa (sem vazar erro tardio)
+  if (mpRole === 'guest' && !mpOn) { try { Net.stop(); } catch (e) {} mpRole = 'off'; $('mpMsg').textContent = ''; }
   mpShow('home');
 });
 // convidado inicia a partida quando o host sinaliza
@@ -1519,7 +1527,7 @@ if (isMobile) {
 requestAnimationFrame(loop);
 
 // marca de build — permite conferir (console do PC / tela de multiplayer) se o navegador carregou ESTE arquivo
-const OT_BUILD = 'v4 — sala de 6 dígitos (sem convite gigante)';
+const OT_BUILD = 'v5 — sala conecta em todos os sinalizadores';
 console.log('[Operação Tática] game.js build ' + OT_BUILD);
 const mpVersionEl = $('mpVersion');
 if (mpVersionEl) mpVersionEl.textContent = 'build ' + OT_BUILD;

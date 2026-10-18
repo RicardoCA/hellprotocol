@@ -23,8 +23,17 @@ let myId = 'p' + Math.floor(Math.random() * 1e6).toString(36);
 let serverName = 'Servidor';
 // sala de 6 dígitos (sinalização via MQTT público)
 let room = '';              // código atual (host: gerado; convidado: digitado)
-let roomMqtt = null;        // conexão MQTT ativa
+let roomEpoch = 0;          // geração da sala — invalida tentativas antigas ao refazer
+let roomConns = [];         // conexões MQTT ativas: [{m, broker, idx}] — TODOS os brokers
 let roomHandler = null;     // roteador (tópico, payload) da sala
+let roomReconn = {};        // idx -> timer de reconexão
+let offerPubT = {};         // gid -> ts da última publicação da oferta (evita spam no retry)
+let onStage = null;         // callback de progresso da conexão (mostrado na UI)
+// fecha todas as conexões de sinalização abertas
+function roomCloseConns() {
+  for (let i = 0; i < roomConns.length; i++) { try { roomConns[i].m.close(); } catch (e) {} }
+  roomConns = [];
+}
 
 function peers() {
   const out = [];
@@ -119,13 +128,19 @@ function mqttConnect(broker, clientId, onPublish, onClose) {
     let ws;
     try { ws = new WebSocket(broker, 'mqtt'); } catch (e) { reject(e); return; }
     ws.binaryType = 'arraybuffer';
-    let connected = false, pingT = null, nextPid = 1;
+    let connected = false, settled = false, pingT = null, nextPid = 1;
     const cleanup = function () { if (pingT) { clearInterval(pingT); pingT = null; } };
-    const fail = function (err) { cleanup(); try { ws.close(); } catch (e) {} reject(err); };
-    const timer = setTimeout(function () { fail(new Error('timeout')); }, 7000);
-    ws.onerror = function () { clearTimeout(timer); fail(new Error('falha no WebSocket')); };
-    ws.onclose = function () {
+    const fail = function (err) {
+      if (settled) return; // idempotente: onclose/onerror/timeout podem competir
+      settled = true;
+      cleanup();
       clearTimeout(timer);
+      try { ws.close(); } catch (e) {}
+      reject(err);
+    };
+    const timer = setTimeout(function () { fail(new Error('timeout')); }, 4500);
+    ws.onerror = function () { fail(new Error('falha no WebSocket')); };
+    ws.onclose = function () {
       if (!connected) fail(new Error('conexão fechada pelo broker'));
       else { cleanup(); if (onClose) onClose(); }
     };
@@ -163,50 +178,89 @@ function mqttConnect(broker, clientId, onPublish, onClose) {
     };
   });
 }
-// tenta os brokers em ordem até um responder
-function mqttConnectNext() {
-  const clientId = 'hp' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36);
-  const tryOne = function (idx) {
-    if (idx >= BROKERS.length) return Promise.reject(new Error('Servidor de sinalização indisponível — tente novamente em instantes.'));
-    return mqttConnect(BROKERS[idx], clientId,
-      function (t, p) { if (roomHandler) roomHandler(t, p); },
-      function () { roomMqtt = null; roomHandler = null; }).catch(function () { return tryOne(idx + 1); });
-  };
-  return tryOne(0);
+// conecta em TODOS os brokers de uma vez — host e convidado precisam compartilhar
+// pelo menos um; publicar/escutar em todos garante o encontro mesmo se um broker
+// estiver bloqueado em uma das redes
+function mqttConnectAll() {
+  const base = Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36);
+  const attempts = BROKERS.map(function (b, idx) {
+    return mqttConnect(b, 'hp' + base + idx, roomOnPublish, function () { roomConnDropped(idx); })
+      .then(function (m) { return { m: m, broker: b, idx: idx }; })
+      .catch(function () { return null; });
+  });
+  return Promise.all(attempts).then(function (list) {
+    const conns = list.filter(Boolean);
+    if (conns.length === 0) throw new Error('Servidor de sinalização indisponível — tente novamente em instantes.');
+    return conns;
+  });
 }
+function roomOnPublish(topic, payload) { if (roomHandler) roomHandler(topic, payload); }
+function roomPublish(topic, text) {
+  for (let i = 0; i < roomConns.length; i++) { try { roomConns[i].m.publish(topic, text); } catch (e) {} }
+}
+function roomSubscribeAll(m) {
+  if (role === 'host') { m.subscribe(topicJoin()); m.subscribe('hp/' + room + '/a/+'); }
+  else if (role === 'guest') m.subscribe(topicOf(myId));
+}
+// se uma conexão cair com a sala ativa, reconecta o mesmo broker sozinho (re-subscreve)
+function roomConnDropped(idx) {
+  const ep = roomEpoch;
+  roomConns = roomConns.filter(function (c) { return c.idx !== idx; });
+  if (!room || roomReconn[idx]) return;
+  roomReconn[idx] = setTimeout(function () {
+    delete roomReconn[idx];
+    if (ep !== roomEpoch || !room) return;
+    mqttConnect(BROKERS[idx], 'hpr' + Date.now().toString(36) + idx, roomOnPublish, function () { roomConnDropped(idx); })
+      .then(function (m) {
+        if (ep !== roomEpoch || !room) { try { m.close(); } catch (e) {} return; }
+        roomConns.push({ m: m, broker: BROKERS[idx], idx: idx });
+        roomSubscribeAll(m);
+        if (onStage) onStage('Sinalização reconectada (' + brokerName(BROKERS[idx]) + ')');
+      }).catch(function () { roomConnDropped(idx); });
+  }, 3000);
+}
+function brokerName(url) { return String(url).split('/')[2]; }
 
 // ---------- sala de 6 dígitos (host gera; convidados entram) ----------
 function topicJoin() { return 'hp/' + room + '/j'; }
 function topicOf(gid) { return 'hp/' + room + '/o/' + gid; }
 function topicAn(gid) { return 'hp/' + room + '/a/' + gid; }
-// resolve com o SDP local quando o ICE termina (ou após 1,5s — rede lenta não pode travar a sala)
+// resolve com o SDP local quando o ICE termina (ou após 2,5s — dá tempo ao STUN
+// sem travar a sala em redes lentas)
 function waitIce(pc) {
   return new Promise(function (resolve) {
     let done = false;
     const fin = function () { if (!done) { done = true; resolve({ type: pc.localDescription.type, sdp: pc.localDescription.sdp }); } };
     pc.onicecandidate = function (ev) { if (ev.candidate === null) fin(); };
-    setTimeout(fin, 1500);
+    setTimeout(fin, 2500);
   });
 }
-// host: gera o código de 6 dígitos, conecta ao broker e escuta os convidados da sala
+// host: gera o código de 6 dígitos, conecta a TODOS os brokers e escuta os convidados
 function hostRoom() {
   if (!hasRTC) return Promise.reject(new Error('WebRTC não suportado neste navegador.'));
   if (!hasWS) return Promise.reject(new Error('WebSocket não suportado neste navegador.'));
+  roomCloseConns();
+  const ep = ++roomEpoch;
+  offerPubT = {};
   room = String(Math.floor(100000 + Math.random() * 900000));
-  return mqttConnectNext().then(function (m) {
-    roomMqtt = m;
+  if (onStage) onStage('Conectando ao servidor de sinalização…');
+  return mqttConnectAll().then(function (conns) {
+    if (ep !== roomEpoch) { conns.forEach(function (c) { try { c.m.close(); } catch (e) {} }); return room; }
+    roomConns = conns;
     roomHandler = function (topic, payload) {
       let d = null;
       if (topic === topicJoin()) {
         try { d = JSON.parse(payload); } catch (e) { return; }
-        if (d && d.id) hostRoomAccept(d.id);
+        if (d && d.id) { console.log('[sala] convidado pediu entrada:', d.id); hostRoomAccept(d.id); }
       } else if (topic.indexOf('hp/' + room + '/a/') === 0) {
         try { d = JSON.parse(payload); } catch (e) { return; }
-        if (d && d.a) hostRoomAnswer(topic.slice(('hp/' + room + '/a/').length), d.a);
+        if (d && d.a) { console.log('[sala] resposta recebida de', topic); hostRoomAnswer(topic.slice(('hp/' + room + '/a/').length), d.a); }
       }
     };
-    m.subscribe(topicJoin());
-    m.subscribe('hp/' + room + '/a/+');
+    conns.forEach(function (c) { roomSubscribeAll(c.m); });
+    const nomes = conns.map(function (c) { return brokerName(c.broker); }).join(' + ');
+    console.log('[sala] host conectado aos sinalizadores:', nomes);
+    if (onStage) onStage('Sala aberta — sinalização: ' + nomes);
     return room;
   });
 }
@@ -214,9 +268,14 @@ function hostRoom() {
 function hostRoomAccept(gid) {
   if (!gid) return;
   if (rtcPeers[gid]) {
-    if (rtcPeers[gid].offerSdp && roomMqtt) roomMqtt.publish(topicOf(gid), JSON.stringify({ o: rtcPeers[gid].offerSdp })); // retry do convidado
+    // retry do convidado: reenvia a MESMA oferta (no máximo 1x a cada 1,5s)
+    if (rtcPeers[gid].offerSdp && roomConns.length && Date.now() - (offerPubT[gid] || 0) > 1500) {
+      offerPubT[gid] = Date.now();
+      roomPublish(topicOf(gid), JSON.stringify({ o: rtcPeers[gid].offerSdp }));
+    }
     return;
   }
+  offerPubT[gid] = Date.now();
   const pc = makePc();
   const dc = pc.createDataChannel('game');
   wireChannel(gid, dc);
@@ -225,13 +284,15 @@ function hostRoomAccept(gid) {
     .then(function () { return waitIce(pc); })
     .then(function (desc) {
       rtcPeers[gid].offerSdp = desc;
-      if (roomMqtt) roomMqtt.publish(topicOf(gid), JSON.stringify({ o: desc }));
-    }).catch(function () {});
+      roomPublish(topicOf(gid), JSON.stringify({ o: desc }));
+    }).catch(function (e) { console.log('[sala] falha ao publicar oferta:', e && e.message); });
 }
-// host: recebe a resposta de um convidado específico
+// host: recebe a resposta de um convidado específico (pode chegar duplicada via vários brokers)
 function hostRoomAnswer(gid, answer) {
   const p = rtcPeers[gid];
-  if (p && p.pc.localDescription && !p.pc.remoteDescription) p.pc.setRemoteDescription(answer).catch(function () {});
+  if (!p || p.answered) return;
+  p.answered = true;
+  p.pc.setRemoteDescription(answer).catch(function () { p.answered = false; });
 }
 // convidado: entra na sala pelo código de 6 dígitos
 function joinRoom(code) {
@@ -240,8 +301,13 @@ function joinRoom(code) {
   room = String(code || '').replace(/\D/g, '');
   if (room.length !== 6) return Promise.reject(new Error('O código da sala tem 6 dígitos.'));
   role = 'guest';
-  return mqttConnectNext().then(function (m) {
-    roomMqtt = m;
+  roomCloseConns();
+  const ep = ++roomEpoch;
+  if (onStage) onStage('Conectando ao servidor de sinalização…');
+  return mqttConnectAll().then(function (conns) {
+    if (ep !== roomEpoch) { conns.forEach(function (c) { try { c.m.close(); } catch (e) {} }); return; }
+    roomConns = conns;
+    if (onStage) onStage('Procurando a sala ' + room + ' em ' + conns.length + ' servidor(es) de sinalização…');
     return new Promise(function (resolve, reject) {
       let joined = false, retryT = null, giveT = null;
       const offTopic = topicOf(myId);
@@ -250,7 +316,7 @@ function joinRoom(code) {
         let d = null;
         try { d = JSON.parse(payload); } catch (e) { return; }
         if (!d || !d.o) return;
-        joined = true;
+        joined = true; // ofertas duplicadas (vários brokers) são ignoradas — a primeira vence
         clearInterval(retryT); clearTimeout(giveT);
         const pc = makePc();
         rtcPeers[myId] = { pc: pc, dc: null, open: false };
@@ -262,18 +328,22 @@ function joinRoom(code) {
           .then(function (a) { return pc.setLocalDescription(a); })
           .then(function () { return waitIce(pc); })
           .then(function (desc) {
-            if (roomMqtt) roomMqtt.publish(topicAn(myId), JSON.stringify({ a: desc }));
+            roomPublish(topicAn(myId), JSON.stringify({ a: desc }));
             resolve();
           }).catch(reject);
       };
-      m.subscribe(offTopic);
-      const attempt = function () { if (roomMqtt && !joined) m.publish(topicJoin(), JSON.stringify({ id: myId })); };
+      conns.forEach(function (c) { roomSubscribeAll(c.m); });
+      const attempt = function () {
+        if (ep !== roomEpoch) { clearInterval(retryT); return; } // tentativa cancelada — para de publicar
+        if (roomConns.length && !joined) roomPublish(topicJoin(), JSON.stringify({ id: myId }));
+      };
       attempt();
       retryT = setInterval(attempt, 2500); // re-pede a oferta até o host responder
       giveT = setTimeout(function () {
         clearInterval(retryT);
-        reject(new Error('O host não respondeu — confira o código da sala.'));
-      }, 9000);
+        if (ep !== roomEpoch) return; // tentativa já foi cancelada — não rejeita
+        reject(new Error('O host não respondeu — confira o código da sala e se o servidor continua aberto.'));
+      }, 12000);
     });
   });
 }
@@ -339,8 +409,11 @@ function send(data) {
 }
 function stop() {
   role = 'off';
+  roomEpoch++; // invalida reconexões/tentativas pendentes da sala
   roomHandler = null;
-  if (roomMqtt) { try { roomMqtt.close(); } catch (e) {} roomMqtt = null; }
+  roomCloseConns();
+  for (const k in roomReconn) { clearTimeout(roomReconn[k]); delete roomReconn[k]; }
+  offerPubT = {};
   room = '';
   if (beaconTimer) { clearInterval(beaconTimer); beaconTimer = null; }
   for (const id in rtcPeers) {
@@ -364,15 +437,21 @@ window.Net = {
   get id() { return myId; },
   get peers() { return peers(); },
   get lobby() { return lobbyList(); },
-  // diagnóstico da sala: estado dos paces WebRTC criados por ela
+  // diagnóstico da sala: estado dos paces WebRTC criados por ela + sinalizadores em uso
   _roomState: function () {
-    const out = { room: room, peers: [] };
+    const out = {
+      room: room,
+      brokers: roomConns.map(function (c) { return brokerName(c.broker); }),
+      peers: []
+    };
     for (const id in rtcPeers) {
       const p = rtcPeers[id];
       out.peers.push({ id: id, open: !!p.open, hasOffer: !!(p.offerSdp || (p.pc && p.pc.localDescription)), hasAnswer: !!(p.pc && p.pc.remoteDescription) });
     }
     return out;
   },
+  // progresso da conexão (o jogo mostra na tela)
+  onStage: function (cb) { onStage = cb; },
   onMsg: function (cb) { onMsg = cb; },
   onPeers: function (cb) { onPeers = cb; },
   onLobby: function (cb) { onLobby = cb; },
@@ -380,7 +459,8 @@ window.Net = {
   _testMqtt: function () {
     const topic = 'hp/teste/' + Date.now().toString(36);
     const prevHandler = roomHandler;
-    return mqttConnectNext().then(function (m) {
+    return mqttConnectAll().then(function (conns) {
+      const m = conns[0].m;
       return new Promise(function (resolve, reject) {
         roomHandler = function (t, p) {
           if (t !== topic) return;
