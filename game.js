@@ -976,6 +976,14 @@ function mpDisconnect() {
   if (mpMapSelEl) mpMapSelEl.disabled = false; // libera a escolha de mapa para a próxima partida
 }
 
+// mensagem do convidado: aparece na tela inicial E na tela de entrada da sala
+// (o mpMsg da home fica escondido enquanto o convidado está na tela de entrar)
+function mpGuestMsg(text) {
+  $('mpMsg').textContent = text;
+  const st = $('mpRoomStatus');
+  if (st) st.textContent = text;
+}
+
 function mpConnectNet() {
   if (typeof Net === 'undefined') { $('mpMsg').textContent = 'Módulo de rede não carregado.'; return false; }
   Net.onMsg(function (d, from) { mpOnMsg(d, from); });
@@ -984,7 +992,7 @@ function mpConnectNet() {
   Net.onStage(function (txt) {
     // progresso da conexão da sala: host vê no status, convidado no msg
     if (mpRole === 'host') $('mpStatus').textContent = txt;
-    else if (mpRole === 'guest') $('mpMsg').textContent = txt;
+    else if (mpRole === 'guest') mpGuestMsg(txt);
   });
   return true;
 }
@@ -993,7 +1001,7 @@ function mpUpdatePeers(list) {
   if (mpRole === 'guest' && !mpOn && list.length > 0) {
     mpOn = true;
     Net.send({ t: 'hi', n: mpName });
-    $('mpMsg').textContent = 'Conectado! Aguardando o host iniciar a partida…';
+    mpGuestMsg('Conectado! Aguardando o host iniciar a partida…');
   }
   if (!mpOn) return;
   for (const id in mpRemote) {
@@ -1236,14 +1244,14 @@ $('mpHostBack').addEventListener('click', function () {
 });
 $('mpJoinRoom').addEventListener('click', function () {
   const code = $('mpRoomInput').value.trim();
-  if (!/^\d{6}$/.test(code)) { $('mpMsg').textContent = 'Digite o código de 6 dígitos da sala.'; return; }
+  if (!/^\d{6}$/.test(code)) { mpGuestMsg('Digite o código de 6 dígitos da sala.'); return; }
   mpConnectNet();
   mpRole = 'guest'; // papel definido já na entrada — permite processar world/start do host
-  $('mpMsg').textContent = 'Entrando na sala ' + code + '…';
+  mpGuestMsg('Entrando na sala ' + code + '…');
   Net.joinRoom(code).then(function () {
-    $('mpMsg').textContent = 'Sala encontrada — conectando ao host…';
+    mpGuestMsg('Sala encontrada — conectando ao host…');
   }).catch(function (e) {
-    if (mpRole === 'guest') $('mpMsg').textContent = 'Erro: ' + e.message; // só mostra se ainda estiver aguardando
+    if (mpRole === 'guest') mpGuestMsg('Erro: ' + e.message); // só mostra se ainda estiver aguardando
   });
 });
 $('mpRoomInput').addEventListener('input', function () {
@@ -1254,7 +1262,7 @@ $('mpRoomInput').addEventListener('keydown', function (e) {
 });
 $('mpBrowseBack').addEventListener('click', function () {
   // se o convidado estava aguardando a sala, cancela a tentativa (sem vazar erro tardio)
-  if (mpRole === 'guest' && !mpOn) { try { Net.stop(); } catch (e) {} mpRole = 'off'; $('mpMsg').textContent = ''; }
+  if (mpRole === 'guest' && !mpOn) { try { Net.stop(); } catch (e) {} mpRole = 'off'; mpGuestMsg(''); }
   mpShow('home');
 });
 // convidado inicia a partida quando o host sinaliza
@@ -1526,11 +1534,13 @@ if (isMobile) {
 
 requestAnimationFrame(loop);
 
-// marca de build — permite conferir (console do PC / tela de multiplayer) se o navegador carregou ESTE arquivo
-const OT_BUILD = 'v5 — sala conecta em todos os sinalizadores';
+// marca de build — permite conferir (console do PC / telas do multiplayer) se o navegador carregou ESTE arquivo
+const OT_BUILD = 'v6 — progresso visível na entrada da sala';
 console.log('[Operação Tática] game.js build ' + OT_BUILD);
 const mpVersionEl = $('mpVersion');
 if (mpVersionEl) mpVersionEl.textContent = 'build ' + OT_BUILD;
+const mpRoomStatusEl = $('mpRoomStatus');
+if (mpRoomStatusEl) mpRoomStatusEl.textContent = 'build ' + OT_BUILD; // conferir no celular antes de entrar
 
 // gancho de depuração para testes automatizados (não afeta a jogabilidade)
 window.__OT = {

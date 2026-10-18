@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
 <link rel="apple-touch-icon" href="favicon.svg" />
 <title>Hell Protocol</title>
@@ -51,6 +54,10 @@
   .modeopt:hover { color: #ffffff; }
   .modeopt2 { display: block; width: max-content; margin: 6px auto 0; pointer-events: auto; cursor: pointer; background: none; border: 0; padding: 3px 10px; font-family: inherit; font-size: 15px; font-weight: 700; letter-spacing: 2px; color: #4fd26a; text-transform: uppercase; transition: color .12s; }
   .modeopt2:hover { color: #ffffff; }
+  /* no toque o :hover fica preso depois do toque — mantém a cor normal */
+  @media (hover: none) {
+    .modeopt:hover, .modeopt2:hover, .srvjoin:hover { color: #4fd26a; }
+  }
   .codebox { display: block; width: 100%; max-width: 520px; margin: 6px auto 0; pointer-events: auto; background: rgba(10,18,14,.8); border: 1px solid #3a5a42; border-radius: 4px; color: #bfe8c4; font-family: Consolas, monospace; font-size: 10px; padding: 6px; resize: vertical; height: 54px; }
   .roomcode { display: block; width: max-content; margin: 14px auto 0; padding: 10px 26px; font-family: Consolas, monospace; font-size: 40px; font-weight: 700; letter-spacing: 10px; color: #8fe6a0; background: rgba(10,18,14,.8); border: 1px solid #3a5a42; border-radius: 6px; text-shadow: 0 0 12px rgba(80,220,110,.35); }
   .roominput { display: block; width: 210px; margin: 8px auto 0; pointer-events: auto; text-align: center; background: rgba(10,18,14,.8); border: 1px solid #3a5a42; border-radius: 4px; color: #bfe8c4; font-family: Consolas, monospace; font-size: 22px; letter-spacing: 6px; padding: 8px 8px 8px 14px; }
@@ -283,6 +290,7 @@
             <b>Código da sala</b><span>digite o código de 6 dígitos do host</span>
           </div>
           <input id="mpRoomInput" class="roominput" type="text" inputmode="numeric" maxlength="6" placeholder="ex.: 482913" autocomplete="off">
+          <p id="mpRoomStatus" class="finemode"></p>
           <button class="modeopt2" id="mpJoinRoom">Entrar na Sala</button>
           <button class="modeopt" id="mpBrowseBack">Voltar</button>
         </div>
@@ -336,10 +344,10 @@
   </div>
 </div>
 
-<script src="audio.js?v=5"></script>
-<script src="textures.js?v=5"></script>
-<script src="engine.js?v=5"></script>
-<script src="net.js?v=5"></script>
-<script src="game.js?v=5"></script>
+<script src="audio.js?v=6"></script>
+<script src="textures.js?v=6"></script>
+<script src="engine.js?v=6"></script>
+<script src="net.js?v=6"></script>
+<script src="game.js?v=6"></script>
 </body>
 </html>
