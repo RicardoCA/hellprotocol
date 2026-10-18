@@ -1198,11 +1198,13 @@ $('mpStart').addEventListener('click', function () {
   mpRole = 'host';
   mpReady = false; // servidor no ar, mas a partida só começa no "Iniciar Partida"
   $('mpLobby').classList.remove('hidden');
-  $('mpStatus').textContent = 'Servidor no ar — aguardando jogadores…';
-  Net.hostCreateInvite().then(function (code) {
-    $('mpInvite').value = code;
+  $('mpRoom').textContent = '······';
+  $('mpStatus').textContent = 'Abrindo a sala…';
+  Net.hostRoom().then(function (code) {
+    $('mpRoom').textContent = code;
+    $('mpStatus').textContent = 'Servidor no ar — aguardando jogadores…';
   }).catch(function (e) {
-    $('mpStatus').textContent = 'Erro ao gerar convite: ' + e.message;
+    $('mpStatus').textContent = 'Erro ao abrir a sala: ' + e.message;
   });
 });
 $('mpGo').addEventListener('click', function () {
@@ -1216,42 +1218,33 @@ $('mpGo').addEventListener('click', function () {
     Net.send({ t: 'start', map: selectedMap, round: 1 });
   }
 });
-$('mpCopy').addEventListener('click', function () {
-  const ta = $('mpInvite');
-  ta.select();
+$('mpCopyRoom').addEventListener('click', function () {
+  const code = $('mpRoom').textContent;
   try { document.execCommand('copy'); } catch (e) {}
-  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).catch(function () {});
-  $('mpStatus').textContent = 'Convite copiado — envie ao convidado.';
-});
-$('mpAccept').addEventListener('click', function () {
-  const code = $('mpAnswer').value.trim();
-  if (!code) { $('mpStatus').textContent = 'Cole o código de resposta do convidado.'; return; }
-  Net.hostAcceptAnswer(code);
-  $('mpStatus').textContent = 'Conectando convidado…';
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).catch(function () {});
+  $('mpStatus').textContent = 'Código da sala copiado.';
 });
 $('mpHostBack').addEventListener('click', function () {
   if (mpOn && mpRole === 'host' && !mpReady) { Net.stop(); mpOn = false; mpRole = 'off'; $('mpMapSel').disabled = false; }
   mpShow('home');
 });
-$('mpJoinCode').addEventListener('click', function () {
-  const code = $('mpHostCode').value.trim();
-  if (!code) { $('mpMsg').textContent = 'Cole o código de convite do host.'; return; }
+$('mpJoinRoom').addEventListener('click', function () {
+  const code = $('mpRoomInput').value.trim();
+  if (!/^\d{6}$/.test(code)) { $('mpMsg').textContent = 'Digite o código de 6 dígitos da sala.'; return; }
   mpConnectNet();
   mpRole = 'guest'; // papel definido já na entrada — permite processar world/start do host
-  Net.joinByCode(code).then(function (answer) {
-    $('mpOutCode').value = answer;
-    $('mpAnswerBox').classList.remove('hidden');
-    $('mpMsg').textContent = 'Envie o código de resposta ao host.';
+  $('mpMsg').textContent = 'Entrando na sala ' + code + '…';
+  Net.joinRoom(code).then(function () {
+    $('mpMsg').textContent = 'Sala encontrada — conectando ao host…';
   }).catch(function (e) {
     $('mpMsg').textContent = 'Erro: ' + e.message;
   });
 });
-$('mpCopyOut').addEventListener('click', function () {
-  const ta = $('mpOutCode');
-  ta.select();
-  try { document.execCommand('copy'); } catch (e) {}
-  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).catch(function () {});
-  $('mpMsg').textContent = 'Resposta copiada — envie ao host.';
+$('mpRoomInput').addEventListener('input', function () {
+  this.value = this.value.replace(/\D/g, '').slice(0, 6); // só dígitos, no máximo 6
+});
+$('mpRoomInput').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') { e.preventDefault(); $('mpJoinRoom').click(); }
 });
 $('mpBrowseBack').addEventListener('click', function () {
   mpShow('home');
@@ -1526,7 +1519,7 @@ if (isMobile) {
 requestAnimationFrame(loop);
 
 // marca de build — permite conferir (console do PC / tela de multiplayer) se o navegador carregou ESTE arquivo
-const OT_BUILD = 'v3 — mapa do servidor do host corrigido';
+const OT_BUILD = 'v4 — sala de 6 dígitos (sem convite gigante)';
 console.log('[Operação Tática] game.js build ' + OT_BUILD);
 const mpVersionEl = $('mpVersion');
 if (mpVersionEl) mpVersionEl.textContent = 'build ' + OT_BUILD;

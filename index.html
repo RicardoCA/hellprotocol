@@ -52,6 +52,9 @@
   .modeopt2 { display: block; width: max-content; margin: 6px auto 0; pointer-events: auto; cursor: pointer; background: none; border: 0; padding: 3px 10px; font-family: inherit; font-size: 15px; font-weight: 700; letter-spacing: 2px; color: #4fd26a; text-transform: uppercase; transition: color .12s; }
   .modeopt2:hover { color: #ffffff; }
   .codebox { display: block; width: 100%; max-width: 520px; margin: 6px auto 0; pointer-events: auto; background: rgba(10,18,14,.8); border: 1px solid #3a5a42; border-radius: 4px; color: #bfe8c4; font-family: Consolas, monospace; font-size: 10px; padding: 6px; resize: vertical; height: 54px; }
+  .roomcode { display: block; width: max-content; margin: 14px auto 0; padding: 10px 26px; font-family: Consolas, monospace; font-size: 40px; font-weight: 700; letter-spacing: 10px; color: #8fe6a0; background: rgba(10,18,14,.8); border: 1px solid #3a5a42; border-radius: 6px; text-shadow: 0 0 12px rgba(80,220,110,.35); }
+  .roominput { display: block; width: 210px; margin: 8px auto 0; pointer-events: auto; text-align: center; background: rgba(10,18,14,.8); border: 1px solid #3a5a42; border-radius: 4px; color: #bfe8c4; font-family: Consolas, monospace; font-size: 22px; letter-spacing: 6px; padding: 8px 8px 8px 14px; }
+  .roominput::placeholder { color: #4a6a50; letter-spacing: 2px; font-size: 13px; padding-left: 0; }
   .mkeys2 { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 10px auto 0; width: max-content; text-align: left; font-size: 12px; }
   #mpServers { max-height: 180px; overflow-y: auto; margin-top: 8px; }
   .srvrow { display: flex; justify-content: space-between; align-items: center; max-width: 460px; margin: 4px auto; padding: 6px 12px; background: rgba(30,44,54,.55); border: 1px solid #3a5a42; border-radius: 4px; font-size: 13px; color: #bfe8c4; }
@@ -245,9 +248,9 @@
       <!-- tela 2b: multiplayer LAN (WebRTC P2P, sem backend) -->
       <div id="mpMenu" class="hidden">
         <div id="mpHome">
-          <p>Modo LAN — jogue com outras pessoas na sua rede local.</p>
+          <p>Multiplayer — o host cria uma sala e compartilha o <b>código de 6 dígitos</b> com os convidados.</p>
           <button class="modeopt" id="mpHost">Host</button>
-          <button class="modeopt" id="mpBrowse">Browse Servers</button>
+          <button class="modeopt" id="mpBrowse">Entrar na Sala</button>
           <p id="mpMsg" class="finemode"></p>
           <p id="mpVersion" class="fine"></p>
         </div>
@@ -265,32 +268,22 @@
           <div id="mpLobby" class="hidden">
             <p id="mpStatus" class="finemode">Servidor no ar — aguardando jogadores…</p>
             <div class="keys mkeys2">
-              <b>Convite</b><span>envie o código abaixo ao convidado</span>
+              <b>Código da sala</b><span>todos os convidados digitam este código</span>
             </div>
-            <textarea id="mpInvite" class="codebox" readonly></textarea>
-            <button class="modeopt2" id="mpCopy">Copiar convite</button>
-            <div class="keys mkeys2">
-              <b>Resposta</b><span>cole aqui o código de resposta do convidado</span>
-            </div>
-            <textarea id="mpAnswer" class="codebox" placeholder="cole o código aqui…"></textarea>
-            <button class="modeopt2" id="mpAccept">Conectar convidado</button>
+            <div id="mpRoom" class="roomcode">······</div>
+            <button class="modeopt2" id="mpCopyRoom">Copiar código</button>
             <button class="modeopt" id="mpGo">Iniciar Partida</button>
           </div>
           <button class="modeopt" id="mpHostBack">Voltar</button>
         </div>
         <div id="mpBrowseView" class="hidden">
-          <p class="finemode">Servidores locais em execução:</p>
+          <p class="finemode">Abas deste navegador com servidores:</p>
           <div id="mpServers"></div>
           <div class="keys mkeys2">
-            <b>Convidado</b><span>se o host não aparecer, junte-se por código</span>
+            <b>Código da sala</b><span>digite o código de 6 dígitos do host</span>
           </div>
-          <textarea id="mpHostCode" class="codebox" placeholder="cole o código de convite do host…"></textarea>
-          <button class="modeopt2" id="mpJoinCode">Entrar por código</button>
-          <div id="mpAnswerBox" class="hidden">
-            <p class="finemode">Envie ao host o código de resposta:</p>
-            <textarea id="mpOutCode" class="codebox" readonly></textarea>
-            <button class="modeopt2" id="mpCopyOut">Copiar resposta</button>
-          </div>
+          <input id="mpRoomInput" class="roominput" type="text" inputmode="numeric" maxlength="6" placeholder="ex.: 482913" autocomplete="off">
+          <button class="modeopt2" id="mpJoinRoom">Entrar na Sala</button>
           <button class="modeopt" id="mpBrowseBack">Voltar</button>
         </div>
       </div>
@@ -343,10 +336,10 @@
   </div>
 </div>
 
-<script src="audio.js?v=3"></script>
-<script src="textures.js?v=3"></script>
-<script src="engine.js?v=3"></script>
-<script src="net.js?v=3"></script>
-<script src="game.js?v=3"></script>
+<script src="audio.js?v=4"></script>
+<script src="textures.js?v=4"></script>
+<script src="engine.js?v=4"></script>
+<script src="net.js?v=4"></script>
+<script src="game.js?v=4"></script>
 </body>
 </html>

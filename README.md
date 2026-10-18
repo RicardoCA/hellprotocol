@@ -35,6 +35,15 @@ No celular os controles aparecem automaticamente durante o combate (jogue na **h
 
 **Objetivo:** elimine todos os bots da rodada. **Economia:** começa com $800; cada abate paga **$300** e cada rodada vencida **$1000**. Nos **10 segundos** iniciais de cada rodada, aperte **B** para abrir o menu de compra: **Pistola .50 ($650), Escopeta ($1800), Fuzil ($2500), Metralhadora ($3500), Colete ($1000) e Kit de Cura ($600)**. Enquanto o menu estiver aberto (ou o tempo de compra não acabar) **os bots não nascem**. **XP/nível:** cada abate dá **25 XP** e vencer a rodada **+100 XP** — no fim da rodada uma barra animada mostra o progresso até o próximo nível (cada nível pede 100×nível de XP). O nível fica no HUD abaixo do colete e **persiste em localStorage** (sobrevive ao F5). Colete **medkits** (vida), **coletes** (armadura) e **caixas de munição** pelo mapa. Bots alertados aparecem como pontos vermelhos no minimapa.
 
+## Multiplayer
+
+1. Um jogador escolhe **Multiplayer → Host → Iniciar Servidor** — o jogo mostra o **código da sala (6 dígitos)** em destaque.
+2. Os outros jogadores escolhem **Multiplayer → Entrar na Sala**, digitam os **6 dígitos** e conectam — sem copiar/colar nada.
+3. No **mesmo navegador/aba** os servidores aparecem automaticamente na lista (botão "Entrar") — dispensa o código.
+4. O host escolhe o **mapa** no dropdown e clica em **Iniciar Partida** — todos começam na mesma arena.
+
+**Como funciona:** a sala é sinalizada por **MQTT em brokers públicos gratuitos** (EMQX → HiveMQ → Mosquitto, com fallback automático) — o SDP de conexão (oferta/resposta) viaja automaticamente pelos tópicos `hp/<código>/…`, substituindo o antigo convite gigante de copiar/colar. A conexão em si é **WebRTC P2P direto** (o cliente MQTT foi implementado do zero neste projeto — nenhuma biblioteca externa). O **STUN do Google** ajuda a conectar aparelhos em redes diferentes; sem TURN, NATs muito restritivos ainda podem bloquear a conexão. **Diagnóstico:** no console do navegador, `Net._testMqtt()` confere se o servidor de sinalização está acessível. A entrada na sala é por código de 6 dígitos (1 milhão de combinações) — trate o código como senha temporária e feche o servidor quando terminar.
+
 ## Ferramentas de desenvolvimento (opcionais, requerem Node.js)
 
 - `node dev-preview.js` — rasterizador 2D headless que gera PNGs reais do jogo em `dev-out/`: os viewmodels das 3 armas, os 7 frames dos soldados e uma cena completa com bot à frente — usado para validar a arte sem abrir o navegador.
