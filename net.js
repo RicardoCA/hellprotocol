@@ -129,9 +129,15 @@ function mqttParse(buf) {
   if (type === 3) { // PUBLISH
     const tl = (b[i] << 8) | b[i + 1]; i += 2;
     const topic = new TextDecoder().decode(b.subarray(i, i + tl)); i += tl;
-    if ((flags & 6) > 0) i += 2; // packet id (QoS > 0)
+    let pid = 0;
+    if ((flags & 6) > 0) { pid = (b[i] << 8) | b[i + 1]; i += 2; } // packet id (QoS > 0)
     const payload = new TextDecoder().decode(b.subarray(i, bodyEnd));
-    return { type: type, topic: topic, payload: payload };
+    return { type: type, topic: topic, payload: payload, pid: pid };
+  }
+  if (type === 9) { // SUBACK — body: [packet id] + códigos por inscrição
+    const codes = [];
+    for (let k = bodyStart + 2; k < bodyEnd; k++) codes.push(b[k]);
+    return { type: type, codes: codes };
   }
   return { type: type, rc: type === 2 ? b[bodyStart + 1] : 0 };
 }
@@ -176,11 +182,14 @@ function mqttConnect(broker, clientId, onPublish, onClose) {
           subscribe: function (topic) {
             if (ws.readyState !== 1) return;
             const pid = nextPid++; if (nextPid > 65535) nextPid = 1;
-            try { ws.send(mqttPacket(8, 2, concatBytes(new Uint8Array([pid >> 8, pid & 255]), mqttUtf8(topic), new Uint8Array([0])))); } catch (e) {}
+            // QoS 1: o broker confirma a inscrição e retransmite entregas não confirmadas
+            try { ws.send(mqttPacket(8, 2, concatBytes(new Uint8Array([pid >> 8, pid & 255]), mqttUtf8(topic), new Uint8Array([1])))); } catch (e) {}
           },
           publish: function (topic, text) {
             if (ws.readyState !== 1) return;
-            try { ws.send(mqttPacket(3, 0, concatBytes(mqttUtf8(topic), new TextEncoder().encode(text)))); } catch (e) {}
+            const pid = nextPid++; if (nextPid > 65535) nextPid = 1;
+            // QoS 1: o broker guarda e retransmite até o destinatário confirmar (PUBACK)
+            try { ws.send(mqttPacket(3, 2, concatBytes(mqttUtf8(topic), new Uint8Array([pid >> 8, pid & 255]), new TextEncoder().encode(text)))); } catch (e) {}
           },
           close: function () {
             cleanup();
@@ -188,7 +197,15 @@ function mqttConnect(broker, clientId, onPublish, onClose) {
             try { ws.close(); } catch (e) {}
           }
         });
-      } else if (m.type === 3 && onPublish) onPublish(m.topic, m.payload); // PUBLISH
+      } else if (m.type === 3 && onPublish) { // PUBLISH (QoS 1): entrega a mensagem e confirma
+        if (onPublish(m.topic, m.payload) !== false && m.pid) {
+          try { ws.send(mqttPacket(4, 0, new Uint8Array([m.pid >> 8, m.pid & 255]))); } catch (e) {} // PUBACK
+        }
+      } else if (m.type === 9) { // SUBACK — 0x80 = inscrição recusada pelo broker
+        for (const c of (m.codes || [])) {
+          if (c === 0x80) console.log('[sala] inscrição RECUSADA pelo broker em', broker);
+        }
+      }
     };
   });
 }
