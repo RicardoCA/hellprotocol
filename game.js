@@ -1547,7 +1547,7 @@ if (isMobile) {
 requestAnimationFrame(loop);
 
 // marca de build — permite conferir (console do PC / telas do multiplayer) se o navegador carregou ESTE arquivo
-const OT_BUILD = 'v7 — diagnóstico de sinalização ao vivo';
+const OT_BUILD = 'v8 — service worker + TURN para GitHub Pages';
 console.log('[Operação Tática] game.js build ' + OT_BUILD);
 const mpVersionEl = $('mpVersion');
 if (mpVersionEl) mpVersionEl.textContent = 'build ' + OT_BUILD;

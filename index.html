@@ -345,10 +345,17 @@
   </div>
 </div>
 
-<script src="audio.js?v=7"></script>
-<script src="textures.js?v=7"></script>
-<script src="engine.js?v=7"></script>
-<script src="net.js?v=7"></script>
-<script src="game.js?v=7"></script>
+<script src="audio.js?v=8"></script>
+<script src="textures.js?v=8"></script>
+<script src="engine.js?v=8"></script>
+<script src="net.js?v=8"></script>
+<script src="game.js?v=8"></script>
+<script>
+// Service Worker: garante que o GitHub Pages sirva sempre a versão mais recente
+// (rede-primeiro sem cache HTTP). Registrado apenas em HTTPS/localhost.
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+  navigator.serviceWorker.register('sw.js').catch(function () {});
+}
+</script>
 </body>
 </html>

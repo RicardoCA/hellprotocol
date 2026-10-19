@@ -453,8 +453,29 @@ function joinRoom(code) {
   });
 }
 function makePc() {
-  // STUN ajuda a conectar entre redes diferentes (sem TURN, NAT muito restritivo ainda bloqueia)
-  return new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+  // STUN: descobre o IP público (conexão direta quando o NAT permite)
+  // TURN público gratuito: retransmite quando a conexão direta é bloqueada —
+  // é o que permite jogar pela internet (celular no 4G ↔ PC no Wi-Fi).
+  // Na mesma rede Wi-Fi a conexão é direta e o TURN nem é usado.
+  return new RTCPeerConnection({
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      {
+        urls: [
+          'turn:openrelay.metered.ca:80',
+          'turn:openrelay.metered.ca:443',
+          'turn:openrelay.metered.ca:443?transport=tcp'
+        ],
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turns:openrelay.metered.ca:443?transport=tcp',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      }
+    ]
+  });
 }
 function wireChannel(id, dc) {
   dc.onopen = function () {
