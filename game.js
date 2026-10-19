@@ -1223,7 +1223,7 @@ $('mpStart').addEventListener('click', function () {
   $('mpLobby').classList.remove('hidden');
   $('mpRoom').textContent = '······';
   $('mpStatus').textContent = 'Abrindo a sala…';
-  Net.hostRoom().then(function (code) {
+  Net.hostRoom({ map: selectedMap }).then(function (code) {
     $('mpRoom').textContent = code;
     $('mpStatus').textContent = 'Servidor no ar — aguardando jogadores…';
   }).catch(function (e) {
