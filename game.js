@@ -1547,7 +1547,7 @@ if (isMobile) {
 requestAnimationFrame(loop);
 
 // marca de build — permite conferir (console do PC / telas do multiplayer) se o navegador carregou ESTE arquivo
-const OT_BUILD = 'v10 — sinalização QoS 1 (entrega confirmada pelo broker)';
+const OT_BUILD = 'v11 — ICE completo no SDP (canal direto abre na mesma rede)';
 console.log('[Operação Tática] game.js build ' + OT_BUILD);
 const mpVersionEl = $('mpVersion');
 if (mpVersionEl) mpVersionEl.textContent = 'build ' + OT_BUILD;

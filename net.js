@@ -280,14 +280,25 @@ function topicJoin() { return 'hp/' + room + '/j'; }
 function topicOf(gid) { return 'hp/' + room + '/o/' + gid; }
 function topicOAll() { return 'hp/' + room + '/o'; } // difusão: oferta para TODOS os convidados
 function topicAn(gid) { return 'hp/' + room + '/a/' + gid; }
-// resolve com o SDP local quando o ICE termina (ou após 2,5s — dá tempo ao STUN
-// sem travar a sala em redes lentas)
+// resolve com o SDP local quando o ICE termina de coletar TODOS os candidatos
+// (host + STUN). Cortar antes do fim deixava o convidado sem candidatos para
+// conectar — o canal direto nunca abria, mesmo na mesma rede.
 function waitIce(pc) {
   return new Promise(function (resolve) {
     let done = false;
-    const fin = function () { if (!done) { done = true; resolve({ type: pc.localDescription.type, sdp: pc.localDescription.sdp }); } };
+    const fin = function () {
+      if (done) return;
+      done = true;
+      resolve({ type: pc.localDescription.type, sdp: pc.localDescription.sdp });
+    };
+    // caminho principal: o estado de coleta chegou a 'complete' (todos os candidatos)
+    if (typeof pc.iceGatheringState === 'string') {
+      if (pc.iceGatheringState === 'complete') { fin(); return; }
+      pc.onicegatheringstatechange = function () { if (pc.iceGatheringState === 'complete') fin(); };
+    }
+    // alternativa: o evento de fim de coleta (navegadores mais antigos)
     pc.onicecandidate = function (ev) { if (ev.candidate === null) fin(); };
-    setTimeout(fin, 2500);
+    setTimeout(fin, 8000); // teto de segurança — nada pode travar a sala para sempre
   });
 }
 // host: gera o código de 6 dígitos (resolve já — a sala reconecta os sinalizadores em loop
@@ -486,27 +497,15 @@ function joinRoom(code) {
   });
 }
 function makePc() {
-  // STUN: descobre o IP público (conexão direta quando o NAT permite)
-  // TURN público gratuito: retransmite quando a conexão direta é bloqueada —
-  // é o que permite jogar pela internet (celular no 4G ↔ PC no Wi-Fi).
-  // Na mesma rede Wi-Fi a conexão é direta e o TURN nem é usado.
+  // STUN do Google: descobre o IP público para conectar entre redes diferentes.
+  // (O TURN público openrelay.metered.ca morreu — testado: TCP recusado nas 3 portas —
+  // e o navegador esperava o timeout dele, atrasando/cortando a coleta de candidatos.
+  // Sem TURN, na MESMA rede Wi-Fi a conexão é direta via candidatos de rede local;
+  // entre redes diferentes funciona quando o NAT permite conexão direta via STUN.)
   return new RTCPeerConnection({
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
-      {
-        urls: [
-          'turn:openrelay.metered.ca:80',
-          'turn:openrelay.metered.ca:443',
-          'turn:openrelay.metered.ca:443?transport=tcp'
-        ],
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      },
-      {
-        urls: 'turns:openrelay.metered.ca:443?transport=tcp',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      }
+      { urls: 'stun:stun1.l.google.com:19302' }
     ]
   });
 }
