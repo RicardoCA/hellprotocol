@@ -42,14 +42,19 @@ function memSet(k, v, ttl) { MEMORIA.set(k, { v: v, exp: Date.now() + ttl * 1000
 function lerJson(s) { try { return JSON.parse(s); } catch (e) { return null; } }
 // executa comandos no KV via REST (pipeline); cai no armazenamento em memória se não configurado
 async function kvExec(ops) {
+  var kvUrl = (URL_DO_KV || '').replace(/\/+$/, '');
   if (URL_DO_KV && TOKEN_DO_KV) {
-    const r = await fetch(URL_DO_KV, {
+    var r = await fetch(kvUrl + '/pipeline', {
       method: 'POST',
       headers: { authorization: 'Bearer ' + TOKEN_DO_KV, 'content-type': 'application/json' },
       body: JSON.stringify(ops)
     });
-    if (!r.ok) throw new Error('KV ' + r.status);
-    const d = await r.json();
+    if (!r.ok) {
+      var detalhe = '';
+      try { detalhe = (await r.text()).slice(0, 200); } catch (e) {}
+      throw new Error('KV ' + r.status + (detalhe ? ': ' + detalhe : ''));
+    }
+    var d = await r.json();
     return d.result || [];
   }
   const resultados = [];
