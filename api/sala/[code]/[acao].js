@@ -44,33 +44,39 @@ function lerJson(s) { try { return JSON.parse(s); } catch (e) { return null; } }
 async function kvExec(ops) {
   var kvUrl = (URL_DO_KV || '').replace(/\/+$/, '');
   if (URL_DO_KV && TOKEN_DO_KV) {
-    var r = await fetch(kvUrl + '/pipeline', {
-      method: 'POST',
-      headers: { authorization: 'Bearer ' + TOKEN_DO_KV, 'content-type': 'application/json' },
-      body: JSON.stringify(ops)
-    });
-    if (!r.ok) {
-      var detalhe = '';
-      try { detalhe = (await r.text()).slice(0, 200); } catch (e) {}
-      throw new Error('KV ' + r.status + (detalhe ? ': ' + detalhe : ''));
+    // envia cada comando individualmente ao endpoint base — formato universal
+    // (o /pipeline varia entre versões do REST; o comando único é garantido)
+    var resultados = [];
+    for (var i = 0; i < ops.length; i++) {
+      var r = await fetch(kvUrl, {
+        method: 'POST',
+        headers: { authorization: 'Bearer ' + TOKEN_DO_KV, 'content-type': 'application/json' },
+        body: JSON.stringify(ops[i])
+      });
+      if (!r.ok) {
+        var detalhe = '';
+        try { detalhe = (await r.text()).slice(0, 200); } catch (e) {}
+        throw new Error('KV ' + r.status + (detalhe ? ': ' + detalhe : ''));
+      }
+      var d = await r.json();
+      resultados.push(d.result);
     }
-    var d = await r.json();
-    return d.result || [];
+    return resultados;
   }
-  const resultados = [];
+  const RESULTADOS = [];
   for (let i = 0; i < ops.length; i++) {
     const cmd = String(ops[i][0]).toUpperCase(), chave = ops[i][1];
-    if (cmd === 'SET') { memSet(chave, ops[i][2], ops[i][3] === 'EX' ? (Number(ops[i][4]) || 600) : 600); resultados.push('OK'); }
-    else if (cmd === 'GET') resultados.push(memGet(chave));
-    else if (cmd === 'EXISTS') resultados.push(memGet(chave) !== null ? 1 : 0);
-    else if (cmd === 'DEL') { resultados.push(memGet(chave) !== null ? 1 : 0); MEMORIA.delete(chave); }
-    else if (cmd === 'LPUSH') { const l = memGet(chave) || []; l.unshift(ops[i][2]); memSet(chave, l, 300); resultados.push(l.length); }
-    else if (cmd === 'LTRIM') resultados.push('OK');
-    else if (cmd === 'EXPIRE') { const e = MEMORIA.get(chave); if (e) { e.exp = Date.now() + (Number(ops[i][2]) || 300) * 1000; resultados.push(1); } else resultados.push(0); }
-    else if (cmd === 'LRANGE') resultados.push((memGet(chave) || []).slice());
-    else resultados.push(null);
+    if (cmd === 'SET') { memSet(chave, ops[i][2], ops[i][3] === 'EX' ? (Number(ops[i][4]) || 600) : 600); RESULTADOS.push('OK'); }
+    else if (cmd === 'GET') RESULTADOS.push(memGet(chave));
+    else if (cmd === 'EXISTS') RESULTADOS.push(memGet(chave) !== null ? 1 : 0);
+    else if (cmd === 'DEL') { RESULTADOS.push(memGet(chave) !== null ? 1 : 0); MEMORIA.delete(chave); }
+    else if (cmd === 'LPUSH') { const l = memGet(chave) || []; l.unshift(ops[i][2]); memSet(chave, l, 300); RESULTADOS.push(l.length); }
+    else if (cmd === 'LTRIM') RESULTADOS.push('OK');
+    else if (cmd === 'EXPIRE') { const e = MEMORIA.get(chave); if (e) { e.exp = Date.now() + (Number(ops[i][2]) || 300) * 1000; RESULTADOS.push(1); } else RESULTADOS.push(0); }
+    else if (cmd === 'LRANGE') RESULTADOS.push((memGet(chave) || []).slice());
+    else RESULTADOS.push(null);
   }
-  return resultados;
+  return RESULTADOS;
 }
 // handler principal — rota dinâmica: /api/sala/<código>/<ação>
 module.exports = async function handler(req, res) {

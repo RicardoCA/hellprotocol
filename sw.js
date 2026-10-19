@@ -2,7 +2,7 @@
    Estratégia: rede primeiro SEM o cache HTTP do navegador (cache: 'no-store') para
    tudo que é do jogo — derrotando o max-age=600 do GitHub Pages; o cache local
    (Cache API) serve apenas como reserva para o jogo funcionar offline. */
-const CACHE = 'hellproto-v8';
+const CACHE = 'hellproto-v12';
 
 self.addEventListener('install', function () {
   self.skipWaiting(); // nova versão assume o controle imediatamente

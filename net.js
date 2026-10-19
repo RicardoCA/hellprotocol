@@ -34,22 +34,35 @@ let hostJoins = 0;          // host: quantas tentativas de entrada chegaram pela
 let onBroker = null;        // callback de estado por sinalizador (diagnóstico na UI)
 let onStage = null;         // callback de progresso da conexão (mostrado na UI)
 // sinalização via API própria (Vercel + KV) — automática quando /api/ping responde ok
+// API_EXTERNA: se o jogo estiver rodando em localhost/file:// (onde não há /api),
+// pode apontar direto para a API do Vercel — ex: 'https://seu-projeto.vercel.app'.
+// Assim, host (localhost) e convidado (Vercel) usam a MESMA sinalização.
 let apiOk = null;           // null = não testado; true/false após a detecção
+let apiBase = '';           // base da API: '' (mesma origem) ou URL externa
+const API_EXTERNA = '';     // configure aqui se for testar em localhost
 function apiAtiva() { return apiOk === true; }
 function apiDetectar() {
   if (apiOk !== null) return Promise.resolve(apiOk);
-  return fetch('/api/ping', { cache: 'no-store' }).then(function (r) {
-    apiOk = r.ok;
-    if (apiOk) console.log('[sala] sinalização própria (API) disponível — MQTT dispensado');
-    else console.log('[sala] API indisponível — usando sinalizadores MQTT públicos');
-    return apiOk;
-  }).catch(function () {
+  const tenta = function (base) {
+    return fetch(base + '/api/ping', { cache: 'no-store' }).then(function (r) {
+      return r.ok ? base : null;
+    }).catch(function () { return null; });
+  };
+  return tenta('').then(function (local) {
+    if (local !== null) { apiOk = true; apiBase = local; console.log('[sala] sinalização própria (API) na mesma origem — MQTT dispensado'); return true; }
+    if (API_EXTERNA) {
+      return tenta(API_EXTERNA).then(function (ext) {
+        if (ext !== null) { apiOk = true; apiBase = ext; console.log('[sala] sinalização própria (API) via ' + ext + ' — MQTT dispensado'); return true; }
+        apiOk = false; return false;
+      });
+    }
     apiOk = false;
+    console.log('[sala] API indisponível — usando sinalizadores MQTT públicos');
     return false;
   });
 }
 function apiPost(caminho, corpo) {
-  return fetch(caminho, {
+  return fetch(apiBase + caminho, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(corpo),
@@ -61,61 +74,9 @@ function apiPost(caminho, corpo) {
     });
   });
 }
-// host: abre a sala na API e consome entradas+respostas em loop
-function apiHostRoom() {
-  let atraso = 700;
-  return apiPost('/api/sala/' + room + '/abrir', { nome: serverName }).then(function () {
-    if (onStage) onStage('Sala aberta na API — aguardando convidados…');
-    const poll = function () {
-      if (ep !== roomEpoch || role !== 'host') return;
-      fetch('/api/sala/' + room + '/entradas', { cache: 'no-store' }).then(function (r) {
-        return r.ok ? r.json() : null;
-      }).then(function (d) {
-        if (!d) return;
-        const lista = d.entradas || [];
-        for (let i = 0; i < lista.length; i++) {
-          hostJoins++;
-          hostRoomAccept(lista[i].id); // publica a oferta (via API) para este convidado
-        }
-        fetch('/api/sala/' + room + '/respostas', { cache: 'no-store' }).then(function (r) {
-          return r.ok ? r.json() : null;
-        }).then(function (d) {
-          if (!d) return;
-          const respostas = d.respostas || [];
-          for (let i = 0; i < respostas.length; i++) hostRoomAnswer(respostas[i].id, respostas[i].sdp);
-        }).catch(function () {});
-      }).catch(function () {}).then(function () {
-        setTimeout(poll, atraso); // prossegue o loop independentemente
-      });
-    };
-    poll();
-    return room;
-  });
-}
-// convidado: registra a entrada e consome a oferta em loop até chegar (30s)
-function apiJoinRoom() {
-  return apiPost('/api/sala/' + room + '/entrada', { id: myId }).then(function () {
-    if (onStage) onStage('Sala aceita — aguardando a oferta do host…');
-    return new Promise(function (resolve, reject) {
-      let tentativas = 0;
-      const pollT = setInterval(function () {
-        if (ep !== roomEpoch || joined) { clearInterval(pollT); return; }
-        tentativas++;
-        if (onStage) onStage('Aguardando a oferta do host… (' + tentativas + ')');
-        fetch('/api/sala/' + room + '/oferta?id=' + myId, { cache: 'no-store' }).then(function (r) {
-          return r.ok ? r.json() : null;
-        }).then(function (d) {
-          if (!d || !d.oferta) return;
-          clearInterval(pollT); clearTimeout(giveT);
-          roomHandler(offTopic, JSON.stringify({ o: d.oferta })); // mesmo caminho do fluxo MQTT
-        }).catch(function () {});
-      }, 600);
-      const giveT = setTimeout(function () {
-        clearInterval(pollT);
-        if (ep !== roomEpoch) return;
-        reject(new Error('O host não respondeu em 30s — confira o código e tente de novo.'));
-      }, 30000);
-    });
+function apiGet(caminho) {
+  return fetch(apiBase + caminho, { cache: 'no-store' }).then(function (r) {
+    return r.ok ? r.json() : null;
   });
 }
 // fecha todas as conexões de sinalização abertas
@@ -446,13 +407,11 @@ function hostRoom(opts) {
     if (usaApi) {
       // API: registra a sala e consome as filas de entradas e respostas
       return apiPost('/api/sala/' + room + '/abrir', { nome: serverName, map: (opts && opts.map) || '' }).then(function () {
-        if (onStage) onStage('Sala aberta na API — aguardando convidados…');
+        if (onStage) onStage('Sala aberta via API — aguardando convidados…');
         let atraso = 700;
         const poll = function () {
           if (ep !== roomEpoch || role !== 'host') return;
-          fetch('/api/sala/' + room + '/entradas', { cache: 'no-store' }).then(function (r) {
-            return r.ok ? r.json() : null;
-          }).then(function (d) {
+          apiGet('/api/sala/' + room + '/entradas').then(function (d) {
             const lista = (d && d.entradas) || [];
             for (let i = 0; i < lista.length; i++) {
               hostJoins++;
@@ -460,16 +419,14 @@ function hostRoom(opts) {
             }
             if (lista.length && onStage) onStage('Convidado aguardando oferta via API — enviando…');
           }).catch(function () {}).then(function () {
-            fetch('/api/sala/' + room + '/respostas', { cache: 'no-store' }).then(function (r) {
-              return r.ok ? r.json() : null;
-            }).then(function (d) {
+            return apiGet('/api/sala/' + room + '/respostas').then(function (d) {
               const respostas = (d && d.respostas) || [];
               for (let i = 0; i < respostas.length; i++) hostRoomAnswer(respostas[i].id, respostas[i].sdp);
-            }).catch(function () {}).then(function () {
-              if (ep !== roomEpoch || role !== 'host') return;
-              atraso = Math.min(atraso + 100, 1500); // economiza requisições quando ocioso
-              setTimeout(poll, atraso);
-            });
+            }).catch(function () {});
+          }).then(function () {
+            if (ep !== roomEpoch || role !== 'host') return;
+            atraso = Math.min(atraso + 100, 1500); // economiza requisições quando ocioso
+            setTimeout(poll, atraso);
           });
         };
         poll();
@@ -496,7 +453,7 @@ function hostRoom(opts) {
         }
         const nomes = conns.map(function (c) { return brokerName(c.broker); }).join(' + ');
         console.log('[sala] host conectado aos sinalizadores:', nomes);
-        if (onStage) onStage('Sala aberta — sinalização: ' + nomes);
+        if (onStage) onStage('Sala aberta via MQTT (' + nomes + ') — aguardando convidados…');
       }).catch(function () {
         if (ep !== roomEpoch) return;
         if (onStage) onStage('Sinalizadores indisponíveis agora — tentando novamente…');
@@ -630,14 +587,12 @@ function joinRoom(code) {
       if (usaApi) {
         // API própria (Vercel): registra a entrada e busca a oferta do host em loop
         apiPost('/api/sala/' + room + '/entrada', { id: myId }).then(function () {
-          if (onStage) onStage('Sala aceita — aguardando a oferta do host…');
+          if (onStage) onStage('Sala aceita via API — aguardando a oferta do host…');
           let tent = 0;
           const pollT = setInterval(function () {
             if (ep !== roomEpoch || joined) { clearInterval(pollT); return; }
             tent++;
-            fetch('/api/sala/' + room + '/oferta?id=' + myId, { cache: 'no-store' }).then(function (r) {
-              return r.ok ? r.json() : null;
-            }).then(function (d) {
+            apiGet('/api/sala/' + room + '/oferta?id=' + myId).then(function (d) {
               if (!d || !d.oferta) return;
               clearInterval(pollT); clearTimeout(giveT);
               // reusa o processamento existente: cria o pc, aplica e responde
@@ -763,6 +718,7 @@ window.Net = {
   get id() { return myId; },
   get peers() { return peers(); },
   get lobby() { return lobbyList(); },
+  get modo() { return apiOk === true ? 'API' : (apiOk === false ? 'MQTT' : '?'); },
   // diagnóstico da sala: estado dos paces WebRTC criados por ela + sinalizadores em uso
   _roomState: function () {
     const out = {

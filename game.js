@@ -1225,7 +1225,15 @@ $('mpStart').addEventListener('click', function () {
   $('mpStatus').textContent = 'Abrindo a sala…';
   Net.hostRoom({ map: selectedMap }).then(function (code) {
     $('mpRoom').textContent = code;
-    $('mpStatus').textContent = 'Servidor no ar — aguardando jogadores…';
+    const modo = Net.modo || '?';
+    let msg = 'Servidor no ar (sinalização: ' + modo + ') — aguardando jogadores…';
+    if (modo === 'MQTT') {
+      msg += ' · O celular deve abrir a MESMA URL deste PC.';
+      if (/localhost|127\.0\.0\.1/.test(location.hostname)) {
+        msg += ' Em localhost, abra no celular http://IP-DO-PC:8000 (servidor.py, mesma rede).';
+      }
+    }
+    $('mpStatus').textContent = msg;
   }).catch(function (e) {
     $('mpStatus').textContent = 'Erro ao abrir a sala: ' + e.message;
   });
@@ -1263,7 +1271,11 @@ $('mpJoinRoom').addEventListener('click', function () {
   Net.joinRoom(code).then(function () {
     mpGuestMsg('Sala encontrada — conectando ao host…');
   }).catch(function (e) {
-    if (mpRole === 'guest') mpGuestMsg('Erro: ' + e.message); // só mostra se ainda estiver aguardando
+    let msg = e.message;
+    if (/não encontrada/i.test(e.message) && Net.modo === 'API') {
+      msg += ' — confira se o PC abriu a sala pela MESMA URL (a sinalização é por origem).';
+    }
+    if (mpRole === 'guest') mpGuestMsg('Erro: ' + msg); // só mostra se ainda estiver aguardando
   });
 });
 $('mpRoomInput').addEventListener('input', function () {
@@ -1547,7 +1559,7 @@ if (isMobile) {
 requestAnimationFrame(loop);
 
 // marca de build — permite conferir (console do PC / telas do multiplayer) se o navegador carregou ESTE arquivo
-const OT_BUILD = 'v11 — ICE completo no SDP (canal direto abre na mesma rede)';
+const OT_BUILD = 'v12 — sinalização via API própria (Vercel+KV) com MQTT de reserva';
 console.log('[Operação Tática] game.js build ' + OT_BUILD);
 const mpVersionEl = $('mpVersion');
 if (mpVersionEl) mpVersionEl.textContent = 'build ' + OT_BUILD;
