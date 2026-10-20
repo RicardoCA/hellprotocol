@@ -64,6 +64,10 @@ const Sfx = (function () {
     pickup: function () { if (!ensure()) return; tone(620, .09, .35, 'sine', 980); },
     hurt: function () { if (!ensure()) return; tone(95, .16, .6, 'triangle', 55); burst({ dur: .08, freq: 300, q: 1, gain: .4, type: 'lowpass' }); },
     win: function () { if (!ensure()) return; [523, 659, 784].forEach(function (f, i) { setTimeout(function () { if (ctx) tone(f, .22, .35, 'triangle'); }, i * 140); }); },
-    lose: function () { if (!ensure()) return; [392, 311, 233].forEach(function (f, i) { setTimeout(function () { if (ctx) tone(f, .3, .4, 'triangle'); }, i * 180); }); }
+    lose: function () { if (!ensure()) return; [392, 311, 233].forEach(function (f, i) { setTimeout(function () { if (ctx) tone(f, .3, .4, 'triangle'); }, i * 180); }); },
+    nadeThrow: function () { if (!ensure()) return; burst({ dur: .03, freq: 3400, q: 4, gain: .45 }); setTimeout(function () { if (!ctx) return; burst({ dur: .16, freq: 1400, freqEnd: 500, q: 1.2, gain: .35 }); }, 60); },
+    explosion: function () { if (!ensure()) return; burst({ dur: .5, freq: 420, freqEnd: 60, q: .6, gain: 1.3, type: 'lowpass' }); tone(70, .38, .8, 'triangle', 28); setTimeout(function () { if (!ctx) return; burst({ dur: .22, freq: 1800, freqEnd: 300, q: .8, gain: .5 }); }, 40); },
+    flashbang: function () { if (!ensure()) return; burst({ dur: .1, freq: 3000, freqEnd: 1200, q: .9, gain: 1 }); tone(3200, .9, .22, 'sine', 2900); setTimeout(function () { if (!ctx) return; burst({ dur: .3, freq: 900, freqEnd: 200, q: .8, gain: .4 }); }, 30); },
+    smokePop: function () { if (!ensure()) return; burst({ dur: .3, freq: 700, freqEnd: 180, q: .8, gain: .5, type: 'lowpass' }); }
   };
 })();

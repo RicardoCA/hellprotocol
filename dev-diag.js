@@ -40,6 +40,7 @@ function makeSoftCtx(w, h) {
     closePath() { if (path.length) path[path.length - 1].closed = true; },
     arc(x, y, r, a0, a1) { ctx._arcPts(x, y, r, r, 0, a0, a1); },
     ellipse(x, y, rx, ry, rot, a0, a1) { ctx._arcPts(x, y, rx, ry, rot || 0, a0, a1); },
+    bezierCurveTo() {}, quadraticCurveTo() {},
     _arcPts(x, y, rx, ry, rot, a0, a1) {
       if (!path.length) path.push({ pts: [], closed: false });
       const sub = path[path.length - 1];
@@ -323,6 +324,7 @@ function savePNG(name, w, h, rgba) {
 fire(els['play'], 'click', {});
 global.document.pointerLockElement = mainCanvas;
 fire(global.document, 'pointerlockchange', {});
+OT.skipBuyTime(); // os bots só nascem quando o tempo de compra acaba (dev-preview usa o mesmo gancho)
 
 const D2R = Math.PI / 180;
 const botTex = Tex.bot[0];

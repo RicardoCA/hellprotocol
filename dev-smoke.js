@@ -130,12 +130,120 @@ console.log('menu de compra: abrir/comprar/pausar spawn ✔');
 fire(global.window, 'keydown', { code: 'KeyB', preventDefault() {} });
 if (OT.menuOpenNow()) throw new Error('menu não fechou');
 
+// 0b) granadas: compra as 3 no menu (itens 7-9) e troca pelos slots 6-8
+// (a compra precisa ocorrer com o tempo de compra ainda ativo)
+{
+  OT.setMoney(2000);
+  fire(global.window, 'keydown', { code: 'KeyB', preventDefault() {} }); // reabre (buyTime ainda correndo)
+  if (!OT.menuOpenNow()) throw new Error('menu de compra não reabriu');
+  fire(global.window, 'keydown', { code: 'Digit7', preventDefault() {} }); // item 7 = granada explosiva
+  if (OT.player.w !== 'grenade_he') throw new Error('compra não trocou para a granada explosiva');
+  if (OT.getMoney() !== 1700) throw new Error('granada explosiva deveria custar $300, dinheiro: ' + OT.getMoney());
+  if (OT.player.ammo.grenade_he.mag !== 1 || OT.player.ammo.grenade_he.res !== 1) throw new Error('granada explosiva deveria vir com 2 un.');
+  fire(global.window, 'keydown', { code: 'Digit8', preventDefault() {} }); // item 8 = fumaça
+  fire(global.window, 'keydown', { code: 'Digit9', preventDefault() {} }); // item 9 = flash
+  if (OT.getMoney() !== 1350) throw new Error('fumaça+flash deveriam custar $350, dinheiro: ' + OT.getMoney());
+  fire(global.window, 'keydown', { code: 'KeyB', preventDefault() {} }); // fecha
+  if (OT.menuOpenNow()) throw new Error('menu não fechou');
+  fire(global.window, 'keydown', { code: 'Digit7', preventDefault() {} }); // slot 7 = fumaça
+  if (OT.player.w !== 'grenade_smoke') throw new Error('slot 7 não trocou para a fumaça');
+  fire(global.window, 'keydown', { code: 'Digit8', preventDefault() {} }); // slot 8 = flash
+  if (OT.player.w !== 'grenade_flash') throw new Error('slot 8 não trocou para o flash');
+  fire(global.window, 'keydown', { code: 'Digit6', preventDefault() {} }); // slot 6 = explosiva
+  if (OT.player.w !== 'grenade_he') throw new Error('slot 6 não trocou para a explosiva');
+  console.log('granadas: compra (itens 7-9) + slots 6/7/8 ✔');
+}
+
 // spawna os bots (fim do tempo de compra)
 OT.skipBuyTime();
 if (OT.bots.length !== 4) throw new Error('deveriam nascer 4 bots, nasceram ' + OT.bots.length);
 runFrames(1);
 if (String(els['left'].textContent) !== '4') throw new Error('HUD deveria mostrar 4 bots');
 console.log('spawn após tempo de compra ✔');
+
+// 0c) granada explosiva: arremesso, fusível e dano em área
+{
+  const p = OT.player;
+  const target = OT.bots[OT.bots.length - 1]; // não mexe no bots[0] (usado no teste de combate)
+  p.x = 12.5; p.y = 21.5; p.a = -Math.PI / 2; p.hp = 100; p.cool = 0; p.reloading = 0;
+  OT.player.ammo.grenade_he = { mag: 1, res: 0 };
+  const killsBefore = OT.killsNow();
+  OT.playerShoot(); // arremessa
+  if (OT.getNades().length !== 1) throw new Error('granada não foi arremessada');
+  if (OT.player.ammo.grenade_he.mag !== 0) throw new Error('granada não saiu da mão');
+  let exploded = false;
+  for (let i = 0; i < 200 && !exploded; i++) {
+    runFrames(1);
+    const nd = OT.getNades();
+    if (nd.length === 0) { exploded = true; break; }
+    target.x = nd[0].x; target.y = nd[0].y; // cola o bot na granada até o estouro
+  }
+  if (!exploded) throw new Error('granada não explodiu no fusível');
+  if (target.alive) throw new Error('explosão deveria eliminar o bot na detonização');
+  if (OT.killsNow() !== killsBefore + 1) throw new Error('explosão não contou abate');
+  if (OT.stateNow() !== 'play') throw new Error('jogador não deveria morrer com a própria granada longe');
+  console.log('granada explosiva: arremesso + fusível + dano em área ✔');
+
+// 0c-extra) granada sem unidades (0/0): some do HUD e não pode ser equipada
+{
+  if (els['s6'].style.display !== 'none') throw new Error('slot da granada vazia deveria sumir do HUD');
+  fire(global.window, 'keydown', { code: 'Digit1', preventDefault() {} }); // volta para a pistola
+  if (OT.player.w !== 'pistol') throw new Error('não voltou para a pistola');
+  fire(global.window, 'keydown', { code: 'Digit6', preventDefault() {} }); // tenta equipar a granada vazia
+  if (OT.player.w !== 'pistol') throw new Error('granada vazia (0/0) não deveria ser equipável');
+  console.log('granada 0/0: some do HUD e não é equipável ✔');
+}
+}
+
+// 0d) granada de fumaça: nuvem bloqueia a visão do bot
+{
+  const p = OT.player;
+  const target = OT.bots[1];
+  p.x = 12.5; p.y = 21.5; p.a = -Math.PI / 2; p.hp = 100; p.cool = 0; p.reloading = 0;
+  p.w = 'grenade_smoke';
+  OT.player.ammo.grenade_smoke = { mag: 1, res: 0 };
+  OT.playerShoot();
+  const nd = OT.getNades();
+  if (nd.length !== 1) throw new Error('granada de fumaça não foi arremessada');
+  nd[0].fuse = 0.12; // estoura logo à frente do jogador
+  runFrames(20);
+  if (OT.getNades().length !== 0) throw new Error('granada de fumaça não estourou');
+  if (OT.getSmokeClouds().length !== 1) throw new Error('nuvem de fumaça não surgiu');
+  target.x = 12.5; target.y = 18.5;
+  target.alert = true; target.lastSeen = 0; target.blind = 0;
+  runFrames(60); // ~1s: bot alinhado atrás da nuvem não pode ver o jogador
+  if (target.lastSeen < 0.5) throw new Error('fumaça deveria bloquear a visão do bot');
+  OT.getSmokeClouds().splice(0, 1); // dissolve a nuvem
+  runFrames(10);
+  if (target.lastSeen !== 0) throw new Error('sem fumaça o bot deveria ver o jogador');
+  console.log('granada de fumaça: nuvem bloqueia a visão dos bots ✔');
+}
+
+// 0e) granada flash: cega o bot e ofusca quem olha para o clarão
+{
+  const p = OT.player;
+  const target = OT.bots[2];
+  p.x = 12.5; p.y = 21.5; p.a = -Math.PI / 2; p.hp = 100; p.cool = 0; p.reloading = 0;
+  p.w = 'grenade_flash';
+  OT.player.ammo.grenade_flash = { mag: 1, res: 0 };
+  OT.playerShoot();
+  const nd = OT.getNades();
+  if (nd.length !== 1) throw new Error('granada flash não foi arremessada');
+  nd[0].fuse = 0.12; // estoura logo à frente (a voada longa quica de volta no depósito)
+  let popped = false;
+  for (let i = 0; i < 200 && !popped; i++) {
+    runFrames(1);
+    const nd2 = OT.getNades();
+    if (nd2.length === 0) { popped = true; break; }
+    target.x = nd2[0].x; target.y = nd2[0].y; // bot colado no clarão
+  }
+  if (!popped) throw new Error('granada flash não estourou');
+  if (target.blind <= 0) throw new Error('flash deveria cegar o bot próximo');
+  if (OT.getFlashT() <= 0) throw new Error('flash deveria ofuscar quem olha para o clarão');
+  runFrames(150); // efeito passa (f máx ~2s < 2,5s simulados)
+  if (OT.getFlashT() > 0) throw new Error('clarão deveria desaparecer');
+  console.log('granada flash: cega bots + clarão no jogador ✔');
+}
 
 // 1) patrulha livre (2s simulados)
 runFrames(120);

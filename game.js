@@ -108,29 +108,36 @@ const WEAPONS = {
   pistol50: { name: 'PISTOLA .50',       short: '.50',      dmg: 48, spread: 0.022, rate: 0.55,  mag: 7,  reload: 1.4, range: 24, auto: false, sfx: 'pistol50', pellets: 1, kick: 30, noise: 11, price: 650 },
   shotgun:  { name: 'ESCOPETA',          short: 'ESCOPETA', dmg: 12, spread: 0.085, rate: 0.95,  mag: 8,  reload: 2.2, range: 14, auto: false, sfx: 'shotgun',  pellets: 8, kick: 34, noise: 13, price: 1800 },
   rifle:    { name: 'FUZIL DE ASSALTO',  short: 'FUZIL',    dmg: 30, spread: 0.05,  rate: 0.105, mag: 30, reload: 1.7, range: 26, auto: true,  sfx: 'rifle',    pellets: 1, kick: 10, noise: 11, price: 2500 },
-  mg:       { name: 'METRALHADORA LEVE', short: 'METRA',    dmg: 20, spread: 0.065, rate: 0.085, mag: 60, reload: 3.2, range: 24, auto: true,  sfx: 'mg',       pellets: 1, kick: 6,  noise: 12, price: 3500 }
+  mg:       { name: 'METRALHADORA LEVE', short: 'METRA',    dmg: 20, spread: 0.065, rate: 0.085, mag: 60, reload: 3.2, range: 24, auto: true,  sfx: 'mg',       pellets: 1, kick: 6,  noise: 12, price: 3500 },
+  grenade_he:    { name: 'GRANADA EXPLOSIVA', short: 'EXPLOSIVA', mag: 1, reload: 0.55, rate: 0.7, auto: false, sfx: 'nadeThrow', kick: 12, price: 300, pack: 1, max: 3, isNade: true, nade: 'he',    fuse: 1.5, blastR: 3.4, blastDmg: 110, noise: 9 },
+  grenade_smoke: { name: 'GRANADA DE FUMAÇA', short: 'FUMAÇA',    mag: 1, reload: 0.55, rate: 0.7, auto: false, sfx: 'nadeThrow', kick: 12, price: 200, pack: 1, max: 2, isNade: true, nade: 'smoke', fuse: 1.3, cloudR: 2.5, cloudT: 8, noise: 6 },
+  grenade_flash: { name: 'GRANADA FLASH',     short: 'FLASH',     mag: 1, reload: 0.55, rate: 0.7, auto: false, sfx: 'nadeThrow', kick: 12, price: 150, pack: 1, max: 3, isNade: true, nade: 'flash', fuse: 1.1, blindR: 6, noise: 5 }
 };
-const SLOTS = ['pistol', 'pistol50', 'shotgun', 'rifle', 'mg'];
+const SLOTS = ['pistol', 'pistol50', 'shotgun', 'rifle', 'mg', 'grenade_he', 'grenade_smoke', 'grenade_flash'];
 const BUY_LIST = [
   { k: 'pistol50', price: 650 },
   { k: 'shotgun', price: 1800 },
   { k: 'rifle', price: 2500 },
   { k: 'mg', price: 3500 },
   { k: 'armor', price: 1000 },
-  { k: 'health', price: 600 }
+  { k: 'health', price: 600 },
+  { k: 'grenade_he', price: 300 },
+  { k: 'grenade_smoke', price: 200 },
+  { k: 'grenade_flash', price: 150 }
 ];
 
 // ---------- estado ----------
 const player = {
   x: PLAYER_SPAWN[0], y: PLAYER_SPAWN[1], a: -Math.PI / 2,
   hp: 100, armor: 0, w: 'pistol', moving: false, run: true,
-  ammo: { pistol: { mag: 12, res: 36 }, pistol50: { mag: 7, res: 21 }, shotgun: { mag: 8, res: 24 }, rifle: { mag: 30, res: 90 }, mg: { mag: 60, res: 120 } },
+  ammo: { pistol: { mag: 12, res: 36 }, pistol50: { mag: 7, res: 21 }, shotgun: { mag: 8, res: 24 }, rifle: { mag: 30, res: 90 }, mg: { mag: 60, res: 120 }, grenade_he: { mag: 0, res: 0 }, grenade_smoke: { mag: 0, res: 0 }, grenade_flash: { mag: 0, res: 0 } },
   owned: { pistol: true },
   cool: 0, reloading: 0, bob: 0
 };
 let state = 'menu'; // menu | play | pause | win | dead
 let round = 1, kills = 0, winT = 0, deadT = 0;
 let bots = [], pickups = [], parts = [];
+let nades = [], smokeClouds = [], flashT = 0;
 let firing = false, locked = false, minimapOn = true;
 let smoke = [], lastMuzzle = { x: 780, y: 420 };
 let money = 800, menuOpen = false, buyTime = 0, pendingCount = 0, botsSpawned = false, buyMsgT = 0;
@@ -295,6 +302,13 @@ function switchWeapon(w) {
   player.cool = Math.max(player.cool, 0.22);
   firing = false;
 }
+// granada só é equipável/exibida enquanto houver unidades (mag + res > 0)
+function canEquip(k) {
+  if (!player.owned[k]) return false;
+  const w = WEAPONS[k];
+  if (w && w.isNade) { const am = player.ammo[k]; return am.mag + am.res > 0; }
+  return true;
+}
 function toggleMenu() {
   if (state !== 'play' || buyTime <= 0) { Sfx.deny(); return; }
   menuOpen = !menuOpen;
@@ -330,6 +344,19 @@ function buyItem(k) {
     money -= item.price;
     player.hp = Math.min(100, player.hp + 50);
     addFeed('Kit de cura usado (+50 vida)');
+  } else if (WEAPONS[k] && WEAPONS[k].isNade) {
+    const w = WEAPONS[k], am = player.ammo[k];
+    if (am.res >= w.max) { Sfx.deny(); flashBuyMsg('LIMITE DE ' + w.short + ' ATINGIDO'); return; }
+    money -= item.price;
+    if (!player.owned[k]) {
+      player.owned[k] = true;
+      am.mag = 1; am.res = w.pack;
+      switchWeapon(k);
+      addFeed(w.name + ' comprada (2 un.)');
+    } else {
+      am.res = Math.min(w.max, am.res + w.pack);
+      addFeed(w.short + ' +1 granada (' + (am.mag + am.res) + ' no total)');
+    }
   } else {
     money -= item.price;
     player.owned[k] = true;
@@ -363,6 +390,7 @@ function playerShoot() {
   if (am.mag <= 0) { Sfx.empty(); player.cool = 0.3; if (am.res > 0) startReload(); return; }
   am.mag--;
   player.cool = w.rate;
+  if (w.isNade) { throwNade(w); if (am.mag <= 0 && am.res > 0) startReload(); return; }
   Sfx[w.sfx]();
   smoke.push({ x: lastMuzzle.x, y: lastMuzzle.y, vx: -18 - Math.random() * 30, vy: -12 - Math.random() * 18, life: 0.4 + Math.random() * 0.25, max: 0.6, r: 5 + Math.random() * 7 });
   const moving = player.moving ? (player.run ? 1.35 : 1.9) : 1;
@@ -457,6 +485,101 @@ function mpFinishRound() {
   }
 }
 
+// ---------- granadas ----------
+function throwNade(w) {
+  const sp = 13.5;
+  nades.push({
+    x: player.x + Math.cos(player.a) * 0.35, y: player.y + Math.sin(player.a) * 0.35,
+    vx: Math.cos(player.a) * sp + (Math.random() - 0.5) * 0.5,
+    vy: Math.sin(player.a) * sp + (Math.random() - 0.5) * 0.5,
+    kind: w.nade, fuse: w.fuse, spin: Math.random() * 6.283
+  });
+}
+function updateNades(dt) {
+  const fr = Math.exp(-1.55 * dt);
+  for (let i = nades.length - 1; i >= 0; i--) {
+    const n = nades[i];
+    n.fuse -= dt;
+    if (n.fuse <= 0) { explodeNade(n.kind, n.x, n.y); nades.splice(i, 1); continue; }
+    const nx = n.x + n.vx * dt, ny = n.y + n.vy * dt;
+    if (!solidBox(nx, n.y, 0.1)) n.x = nx; else n.vx = -n.vx * 0.45;
+    if (!solidBox(n.x, ny, 0.1)) n.y = ny; else n.vy = -n.vy * 0.45;
+    n.vx *= fr; n.vy *= fr;
+    n.spin += dt * 7;
+  }
+}
+function explodeNade(kind, x, y) {
+  if (kind === 'he') {
+    Sfx.explosion();
+    parts.push({ x: x, y: y, life: 0.28, max: 0.28, s: 1.5, tex: 'boom', v: 0 });
+    for (let i = 0; i < 7; i++) {
+      const a2 = Math.random() * 6.283, dd = Math.random() * 1.4;
+      parts.push({ x: x + Math.cos(a2) * dd, y: y + Math.sin(a2) * dd, life: 0.4 + Math.random() * 0.25, max: 0.6, s: 0.3 + Math.random() * 0.3, tex: 'dust', v: 90 });
+    }
+    const w = WEAPONS.grenade_he, R = w.blastR;
+    const dmgMap = {};
+    for (const b of bots) {
+      if (!b.alive) continue;
+      const d = Math.hypot(b.x - x, b.y - y);
+      if (d > R || !los(x, y, b.x, b.y)) continue;
+      dmgMap[b.id] = Math.round(w.blastDmg * (1 - (d / R) * 0.75));
+    }
+    const pd = Math.hypot(player.x - x, player.y - y);
+    if (pd < R && los(x, y, player.x, player.y)) hurtPlayer(Math.round(w.blastDmg * 0.45 * (1 - (pd / R) * 0.75)));
+    if (mpRole === 'guest') {
+      // autoridade do host: o dano da granada do convidado é reportado ao host
+      if (Object.keys(dmgMap).length > 0) Net.send({ t: 'shot', d: dmgMap, x: +x.toFixed(2), y: +y.toFixed(2), n: 8 });
+    } else {
+      for (const idStr in dmgMap) {
+        const id = +idStr;
+        for (let i = 0; i < bots.length; i++) {
+          if (bots[i].id === id && bots[i].alive) { damageBot(bots[i], dmgMap[idStr], false); break; }
+        }
+      }
+    }
+    for (const b of bots) {
+      if (!b.alive) continue;
+      if (Math.hypot(b.x - x, b.y - y) < 9) { b.alert = true; b.lastSeen = 0; }
+    }
+  } else if (kind === 'smoke') {
+    Sfx.smokePop();
+    smokeClouds.push({ x: x, y: y, t: 0, dur: WEAPONS.grenade_smoke.cloudT });
+    for (const b of bots) {
+      if (!b.alive) continue;
+      if (Math.hypot(b.x - x, b.y - y) < 6) { b.alert = true; b.lastSeen = 0; }
+    }
+  } else {
+    Sfx.flashbang();
+    for (const b of bots) {
+      if (!b.alive) continue;
+      const d = Math.hypot(b.x - x, b.y - y);
+      if (d < WEAPONS.grenade_flash.blindR && los(x, y, b.x, b.y)) {
+        b.blind = 2.6 + Math.random() * 1.4;
+        b.alert = true; b.lastSeen = 0;
+      }
+    }
+    const pd = Math.hypot(player.x - x, player.y - y);
+    if (pd < 8 && los(x, y, player.x, player.y)) {
+      const facing = Math.cos(player.a - Math.atan2(y - player.y, x - player.x));
+      const f = facing > 0.25 ? 1.1 + (1 - pd / 8) * 0.9 : 0.55; // olhando para o clarão = mais forte
+      if (f > flashT) flashT = f;
+    }
+  }
+}
+// a fumaça bloqueia a visão dos bots (interseção segmento-círculo com cada nuvem)
+function smokeBlocks(x0, y0, x1, y1) {
+  const r = WEAPONS.grenade_smoke.cloudR;
+  const dx = x1 - x0, dy = y1 - y0;
+  const len2 = dx * dx + dy * dy || 1e-6;
+  for (const c of smokeClouds) {
+    let tt = ((c.x - x0) * dx + (c.y - y0) * dy) / len2;
+    tt = Math.max(0, Math.min(1, tt));
+    const px = x0 + dx * tt - c.x, py = y0 + dy * tt - c.y;
+    if (px * px + py * py < r * r) return true;
+  }
+  return false;
+}
+
 // ---------- pickups ----------
 function buildPickups() {
   const list = [];
@@ -493,6 +616,7 @@ function makeBot(id, x, y, r) {
     hp: 100, alive: true, alert: false, lastSeen: 0,
     wt: Math.random() * 2.5, dx: 0, dy: 0,
     cool: 0.8 + Math.random() * 1.2, flash: 0, ft: Math.random() * 3,
+    blind: 0,
     deathT: 0, strafeT: 0, strafeDir: 0,
     path: null, pathI: 0, repathT: 0, stuckT: 0,
     speed: 1.5 + r * 0.06 + Math.random() * 0.2, dmg: 7 + r * 0.8
@@ -521,9 +645,10 @@ function chaseMove(b, dx, dy, d, dt) {
 function updateBot(b, dt) {
   if (!b.alive) { b.deathT += dt; return; }
   if (b.flash > 0) b.flash -= dt;
+  if (b.blind > 0) b.blind -= dt;
   const dx = player.x - b.x, dy = player.y - b.y;
   const d = Math.hypot(dx, dy) || 0.001;
-  const seen = d < 15 && los(b.x, b.y, player.x, player.y);
+  const seen = b.blind <= 0 && d < 15 && los(b.x, b.y, player.x, player.y) && !smokeBlocks(b.x, b.y, player.x, player.y);
   if (seen) { b.alert = true; b.lastSeen = 0; }
   else if (b.alert) b.lastSeen += dt;
   if (b.alert && b.lastSeen > 7) b.alert = false;
@@ -612,8 +737,21 @@ function spriteList(t) {
     if (p.taken) continue;
     out.push({ x: p.x, y: p.y, tex: Tex.pickups[p.t], scale: 0.34, vMove: 132 + Math.sin(t * 2.5 + p.seed) * 9 });
   }
+  for (const n of nades) {
+    out.push({ x: n.x, y: n.y, tex: Tex.nades['grenade_' + n.kind], scale: 0.15, vMove: 142 });
+  }
+  for (const c of smokeClouds) {
+    if (c.t >= c.dur) continue;
+    const ph = Math.min(1, c.t / 0.8) * Math.min(1, (c.dur - c.t) / 1.2); // entra/sai suave
+    const grow = 1 + Math.min(1, c.t / 1.6) * 0.5;
+    for (let i = 0; i < 9; i++) {
+      const a2 = i * 0.7 + Math.sin(c.t * 0.7 + i * 2.1) * 0.25;
+      const rr = 0.55 + 0.85 * Math.min(1, c.t / 1.6) + Math.sin(c.t * 0.9 + i * 1.7) * 0.18;
+      out.push({ x: c.x + Math.cos(a2) * rr, y: c.y + Math.sin(a2) * rr, tex: Tex.smokePuff, scale: (0.85 + (i % 3) * 0.28) * (0.55 + 0.45 * ph) * grow, vMove: 128 + (i % 4) * 16 + Math.sin(c.t * 1.2 + i) * 10 });
+    }
+  }
   for (const q of parts) {
-    out.push({ x: q.x, y: q.y, tex: q.tex === 'dust' ? Tex.dust : Tex.blood, scale: q.s * (0.35 + 0.65 * (q.life / q.max)), vMove: q.v || 60 });
+    out.push({ x: q.x, y: q.y, tex: q.tex === 'dust' ? Tex.dust : q.tex === 'boom' ? Tex.boom : Tex.blood, scale: q.s * (0.35 + 0.65 * (q.life / q.max)), vMove: q.v || 60 });
   }
   return out;
 }
@@ -675,6 +813,7 @@ function startRound(r) {
   if (menuOpen) { menuOpen = false; $('buymenu').classList.add('hidden'); }
   pickups = buildPickups();
   parts = []; smoke = [];
+  nades = []; smokeClouds = []; flashT = 0;
   roundKills = 0; xpAnim = null;
   $('xppanel').classList.add('hidden');
   player.x = PLAYER_SPAWN[0]; player.y = PLAYER_SPAWN[1]; player.a = -Math.PI / 2;
@@ -733,7 +872,7 @@ function updateHud() {
   $('menulvl').textContent = 'NÍVEL ' + level + ' — ' + xp + '/' + xpNeed(level) + ' XP';
   for (let i = 0; i < SLOTS.length; i++) {
     const el = $('s' + (i + 1)), k = SLOTS[i];
-    el.style.display = player.owned[k] ? 'block' : 'none';
+    el.style.display = canEquip(k) ? 'block' : 'none';
     el.className = player.w === k ? 'on' : '';
   }
   const bt = $('buytimer');
@@ -800,6 +939,8 @@ function drawMinimap() {
 function drawWeapon(c2, t) {
   if (state === 'dead' || state === 'menu') return;
   const w = WEAPONS[player.w];
+  // granada sem nenhuma unidade (0/0) não aparece na mão
+  if (w.isNade && player.ammo[player.w].mag + player.ammo[player.w].res <= 0) return;
   const bobX = Math.sin(player.bob) * 9;
   const bobY = Math.abs(Math.cos(player.bob)) * 7;
   let kick = 0;
@@ -809,7 +950,7 @@ function drawWeapon(c2, t) {
   const spr = Tex.weapons[player.w];
   const bx = 715 + bobX, by = 468 + bobY + kick + rel;
   c2.drawImage(spr.cv, bx - spr.ox, by - spr.oy);
-  if (player.cool > w.rate * 0.55) {
+  if (player.cool > w.rate * 0.55 && !w.isNade) {
     const s2 = 0.8 + Math.random() * 0.6;
     c2.save();
     c2.translate(bx + spr.tipX, by + spr.tipY);
@@ -838,16 +979,16 @@ window.addEventListener('keydown', function (e) {
   keys[e.code] = true;
   if (menuOpen) {
     if (e.code === 'KeyB' || e.code === 'Escape') { toggleMenu(); e.preventDefault(); return; }
-    const nb = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6'].indexOf(e.code);
+    const nb = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9'].indexOf(e.code);
     if (nb >= 0 && nb < BUY_LIST.length) { buyItem(BUY_LIST[nb].k); e.preventDefault(); return; }
     return;
   }
   if (state !== 'play') return;
   if (e.code === 'KeyB') { toggleMenu(); e.preventDefault(); return; }
-  const ns = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'].indexOf(e.code);
+  const ns = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8'].indexOf(e.code);
   if (ns >= 0) {
     const k = SLOTS[ns];
-    if (player.owned[k]) switchWeapon(k); else Sfx.empty();
+    if (canEquip(k)) switchWeapon(k); else Sfx.empty();
   }
   if (e.code === 'KeyR') startReload();
   if (e.code === 'KeyM') {
@@ -1335,6 +1476,7 @@ function loop(ts) {
   const t = ts / 1000;
   if (hurtT > 0) hurtT -= dt;
   if (hitT > 0) { hitT -= dt; if (hitT <= 0) cross.classList.remove('hit'); }
+  if (flashT > 0) flashT -= dt;
   for (let i = smoke.length - 1; i >= 0; i--) {
     const s3 = smoke[i];
     s3.life -= dt; s3.x += s3.vx * dt; s3.y += s3.vy * dt; s3.vy -= 12 * dt;
@@ -1343,6 +1485,11 @@ function loop(ts) {
   if (state === 'play') {
     movePlayer(dt);
     mpTick(dt);
+    updateNades(dt);
+    for (let i = smokeClouds.length - 1; i >= 0; i--) {
+      smokeClouds[i].t += dt;
+      if (smokeClouds[i].t >= smokeClouds[i].dur) smokeClouds.splice(i, 1);
+    }
     if (buyTime > 0 && !menuOpen) {
       buyTime -= dt;
       if (buyTime <= 0) { buyTime = 0; spawnPendingBots(); }
@@ -1389,6 +1536,11 @@ function loop(ts) {
   Engine.render(player.x, player.y, player.a, spriteList(t));
   Engine.blit(ctx, canvas.width, canvas.height);
   drawWeapon(ctx, t);
+  if (flashT > 0) {
+    const fa = Math.min(1, flashT / 1.2) * 0.97; // clarão da flashbang cobre a tela e desfoca
+    ctx.fillStyle = 'rgba(245,248,245,' + fa.toFixed(3) + ')';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
   if (minimapOn) drawMinimap();
   updateHud();
   updateTop();
@@ -1522,17 +1674,17 @@ function initMobileControls() {
   });
   bindBtn('bPause', function () { if (state === 'play') pauseGame(); });
 
-  // --- slots de arma (1-5) tocáveis ---
+  // --- slots de arma (1-8) tocáveis ---
   const slotsEl = $('slots');
   slotsEl.style.pointerEvents = 'auto';
-  for (let i = 1; i <= 5; i++) {
+  for (let i = 1; i <= SLOTS.length; i++) {
     (function (n) {
       const el = $('s' + n);
       el.addEventListener('touchstart', function (e) {
         e.preventDefault();
         if (state !== 'play' || menuOpen) return;
         const k = SLOTS[n - 1];
-        if (player.owned[k]) switchWeapon(k); else Sfx.empty();
+        if (canEquip(k)) switchWeapon(k); else Sfx.empty();
       }, { passive: false });
     })(i);
   }
@@ -1587,6 +1739,9 @@ window.__OT = {
   skipBuyTime: function () { buyTime = 0; spawnPendingBots(); },
   menuOpenNow: function () { return menuOpen; },
   getBuyTime: function () { return buyTime; },
+  getNades: function () { return nades; },
+  getSmokeClouds: function () { return smokeClouds; },
+  getFlashT: function () { return flashT; },
   getLevel: function () { return level; },
   getXp: function () { return xp; },
   loadProgress: loadProgress

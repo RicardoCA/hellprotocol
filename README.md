@@ -15,9 +15,9 @@ No celular os controles aparecem automaticamente durante o combate (jogue na **h
 
 - **Joystick virtual** (canto inferior esquerdo) — analógico: encoste um pouco para andar devagar, empurre até a borda para correr
 - **Arrastar na tela** — mirar/girar a câmera (multi-toque: dá para mirar enquanto anda)
-- **FOGO** (canto inferior direito) — segure para armas automáticas
+- **FOGO** (canto inferior direito) — segure para armas automáticas · arremessa granadas
 - **REC** — recarregar · **COMPRA** — abre o menu de compra · **PAUSA** e **MAPA** — coluna à direita, abaixo do minimapa
-- **Slots 1-5** (base central-esquerda) — trocar de arma tocando
+- **Slots 1-8** (base central-esquerda) — trocar de arma/granada tocando
 
 ### Controles (teclado e mouse)
 
@@ -25,15 +25,15 @@ No celular os controles aparecem automaticamente durante o combate (jogue na **h
 |---|---|
 | `W A S D` | Mover |
 | Mouse | Mirar |
-| Clique esquerdo | Atirar |
-| `R` | Recarregar |
-| `1`-`5` | Trocar armas que você possui |
+| Clique esquerdo | Atirar / arremessar granada |
+| `R` | Recarregar / armar a próxima granada |
+| `1`-`8` | Trocar armas/granadas que você possui |
 | `B` | Abrir/fechar o menu de compra (só durante o tempo de compra) |
 | `Shift` | Andar devagar |
 | `M` | Liga/desliga minimapa |
 | `Esc` | Pausar (solta o mouse) |
 
-**Objetivo:** elimine todos os bots da rodada. **Economia:** começa com $800; cada abate paga **$300** e cada rodada vencida **$1000**. Nos **10 segundos** iniciais de cada rodada, aperte **B** para abrir o menu de compra: **Pistola .50 ($650), Escopeta ($1800), Fuzil ($2500), Metralhadora ($3500), Colete ($1000) e Kit de Cura ($600)**. Enquanto o menu estiver aberto (ou o tempo de compra não acabar) **os bots não nascem**. **XP/nível:** cada abate dá **25 XP** e vencer a rodada **+100 XP** — no fim da rodada uma barra animada mostra o progresso até o próximo nível (cada nível pede 100×nível de XP). O nível fica no HUD abaixo do colete e **persiste em localStorage** (sobrevive ao F5). Colete **medkits** (vida), **coletes** (armadura) e **caixas de munição** pelo mapa. Bots alertados aparecem como pontos vermelhos no minimapa.
+**Objetivo:** elimine todos os bots da rodada. **Economia:** começa com $800; cada abate paga **$300** e cada rodada vencida **$1000**. Nos **10 segundos** iniciais de cada rodada, aperte **B** para abrir o menu de compra: **Pistola .50 ($650), Escopeta ($1800), Fuzil ($2500), Metralhadora ($3500), Colete ($1000), Kit de Cura ($600), Granada Explosiva ($300), Granada de Fumaça ($200) e Granada Flash ($150)**. Enquanto o menu estiver aberto (ou o tempo de compra não acabar) **os bots não nascem**. **Granadas** (slots `6`/`7`/`8`): a **explosiva** causa dano em área com queda por distância (inclusive em você — cuidado!) e alerta os bots por perto; a **fumaça** cria uma nuvem de ~8s que bloqueia a visão dos bots (ótima para reposicionar); a **flash** cega os bots próximos por alguns segundos — se você estiver olhando para o clarão, também fica cego. Cada compra de granada vem com **2 unidades** (1 pronta + 1 reserva) e é possível comprar mais até o limite de reservas; arremesse com o clique esquerdo — a granada quica nas paredes e estoura no fusível. **XP/nível:** cada abate dá **25 XP** e vencer a rodada **+100 XP** — no fim da rodada uma barra animada mostra o progresso até o próximo nível (cada nível pede 100×nível de XP). O nível fica no HUD abaixo do colete e **persiste em localStorage** (sobrevive ao F5). Colete **medkits** (vida), **coletes** (armadura) e **caixas de munição** pelo mapa. Bots alertados aparecem como pontos vermelhos no minimapa.
 
 ## Multiplayer
 

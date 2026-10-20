@@ -40,6 +40,7 @@ function makeSoftCtx(w, h) {
     closePath() { if (path.length) path[path.length - 1].closed = true; },
     arc(x, y, r, a0, a1) { ctx._arcPts(x, y, r, r, 0, a0, a1); },
     ellipse(x, y, rx, ry, rot, a0, a1) { ctx._arcPts(x, y, rx, ry, rot || 0, a0, a1); },
+    bezierCurveTo() {}, quadraticCurveTo() {},
     _arcPts(x, y, rx, ry, rot, a0, a1) {
       if (!path.length) path.push({ pts: [], closed: false });
       const sub = path[path.length - 1];
@@ -316,7 +317,7 @@ function savePNG(name, w, h, rgba) {
 }
 
 // 1) sprites das armas
-for (const k of ['pistol', 'pistol50', 'shotgun', 'rifle', 'mg']) {
+for (const k of ['pistol', 'pistol50', 'shotgun', 'rifle', 'mg', 'grenade_he', 'grenade_smoke', 'grenade_flash']) {
   const spr = Tex.weapons[k];
   const up = upscale(spr.cv._ctx.buf, spr.cv.width, spr.cv.height, 3);
   savePNG('arma-' + k + '.png', up.w, up.h, up.data);

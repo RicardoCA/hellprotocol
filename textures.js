@@ -579,6 +579,50 @@ const Tex = (function () {
     g.beginPath(); g.arc(12, 10, 2.2, 0, 6.283); g.fill();
     return finish(c);
   }
+  // projétil da granada no mundo (32x32, bola com faixa, alavanca e pino)
+  function nadeTex(kind) {
+    const c = cnv(32, 32), g = c.getContext('2d');
+    const BODY = {
+      he: [[0, '#5a6b3a'], [0.5, '#42512e'], [1, '#2a331c']],
+      smoke: [[0, '#7a8a7c'], [0.5, '#5f6e60'], [1, '#3a453c']],
+      flash: [[0, '#a8b0b8'], [0.5, '#8a929a'], [1, '#59616a']]
+    }[kind];
+    const BAND = { he: '#a02a22', smoke: '#3f7ba0', flash: '#e0b83e' }[kind];
+    DOT(g, 16, 17, 12.5, '#0b0e0a'); // contorno
+    DOT(g, 16, 16, 11.5, LG(g, 0, 4, 0, 28, BODY));
+    g.fillStyle = BAND; g.fillRect(6, 13, 20, 5);
+    g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(6, 16.5, 20, 1.5);
+    DOT(g, 18, 20, 6, 'rgba(0,0,0,0.22)'); // sombra inferior
+    DOT(g, 12, 11, 3, 'rgba(255,255,255,0.28)'); // brilho
+    g.fillStyle = '#454e55'; g.fillRect(14, 1, 4, 6); // alavanca
+    g.fillStyle = '#2b3238'; g.fillRect(18, 0, 6, 3);
+    DOT(g, 9, 3, 2.5, '#6b757e'); DOT(g, 9, 3, 1, '#12161a'); // anel do pino
+    return finish(c);
+  }
+  // puff da nuvem de fumaça (48x48, aglomerado de círculos cinza)
+  function smokePuffTex() {
+    const c = cnv(48, 48), g = c.getContext('2d'), r = rng(91);
+    for (let i = 0; i < 9; i++) {
+      const a = r() * 6.283, dd = r() * 9;
+      const v = 138 + ((r() * 26) | 0);
+      g.fillStyle = 'rgba(' + v + ',' + (v + 4) + ',' + (v - 2) + ',0.62)';
+      g.beginPath(); g.arc(24 + Math.cos(a) * dd, 24 + Math.sin(a) * dd, 8 + r() * 6, 0, 6.283); g.fill();
+    }
+    g.fillStyle = 'rgba(170,174,168,0.6)';
+    g.beginPath(); g.arc(24, 22, 12, 0, 6.283); g.fill();
+    return finish(c);
+  }
+  // clarão da explosão (48x48, núcleo branco → laranja)
+  function boomTex() {
+    const c = cnv(48, 48), g = c.getContext('2d');
+    g.fillStyle = 'rgba(255,120,40,0.8)';
+    g.beginPath(); g.arc(24, 24, 22, 0, 6.283); g.fill();
+    g.fillStyle = 'rgba(255,196,80,0.9)';
+    g.beginPath(); g.arc(24, 24, 15, 0, 6.283); g.fill();
+    g.fillStyle = 'rgba(255,246,214,0.95)';
+    g.beginPath(); g.arc(24, 24, 8, 0, 6.283); g.fill();
+    return finish(c);
+  }
 
   //__WART1__
   // Desenha a arma com origem no punho; cano aponta para a esquerda; inclinação +0.30 rad.
@@ -800,6 +844,43 @@ const Tex = (function () {
       P(g2, [[6, -48], [28, -46], [34, -20], [28, 4], [12, 0], [16, -24]], LG(g2, 6, -46, 28, 2, SKIN));
       P(g2, [[20, -2], [52, 2], [56, 28], [14, 26]], '#3d4a35');
       P(g2, [[18, -1], [50, 3], [51, 9], [19, 5]], '#2c3524');
+    } else if (kind.indexOf('grenade') === 0) {
+      // granada erguida na mão — corpo com faixa, alavanca e anel do pino
+      const NADE = {
+        grenade_he:    { body: [[0, '#5a6b3a'], [0.5, '#42512e'], [1, '#2a331c']], band: '#a02a22', band2: '#7c1f18' },
+        grenade_smoke: { body: [[0, '#7a8a7c'], [0.5, '#5f6e60'], [1, '#3a453c']], band: '#3f7ba0', band2: '#2d5c7a' },
+        grenade_flash: { body: [[0, '#a8b0b8'], [0.5, '#8a929a'], [1, '#59616a']], band: '#e0b83e', band2: '#b3902c' }
+      }[kind];
+      // manga / punho
+      P(g2, [[16, 22], [52, 28], [56, 54], [10, 52]], '#4d5e42');
+      P(g2, [[14, 23], [50, 29], [51, 35], [15, 29]], '#2c3524');
+      // corpo da granada
+      DOT(g2, -58, -34, 27, LG(g2, 0, -61, 0, -7, NADE.body));
+      // faixa com pontas arredondadas (retângulo + capas circulares inscritas na bola)
+      g2.fillStyle = NADE.band;
+      g2.fillRect(-78, -40, 40, 12);
+      DOT(g2, -78, -34, 6, NADE.band);
+      DOT(g2, -38, -34, 6, NADE.band);
+      g2.fillStyle = NADE.band2; g2.fillRect(-78, -29.5, 40, 1.5);
+      // sombra e brilho da esfera
+      DOT(g2, -52, -24, 12, 'rgba(0,0,0,0.25)');
+      DOT(g2, -66, -44, 7, 'rgba(255,255,255,0.22)');
+      // alavanca (spoiler) dobrada para a direita
+      P(g2, [[-64, -62], [-56, -64], [-54, -50], [-62, -48]], '#454e55');
+      P(g2, [[-60, -66], [-36, -72], [-34, -64], [-58, -58]], LG(g2, 0, -72, 0, -58, MET));
+      P(g2, [[-38, -74], [-30, -71], [-32, -62], [-40, -64]], '#2b3238');
+      // anel do pino
+      DOT(g2, -70, -68, 4.5, '#6b757e');
+      DOT(g2, -70, -68, 1.8, '#12161a');
+      // dorso da mão segurando por trás
+      P(g2, [[-26, -12], [0, -8], [8, 26], [-6, 44], [-26, 38], [-30, 4]], LG(g2, 0, -10, 0, 42, SKIN));
+      // dedos envolvendo a bola
+      for (let i = 0; i < 4; i++) {
+        const y = -10 + i * 11;
+        P(g2, [[-76 + i * 4, y], [10 - i * 2, y], [8 - i * 2, y + 9], [-76 + i * 4, y + 9]], LG(g2, 0, y, 0, y + 9, SKIN));
+      }
+      // polegar por cima
+      P(g2, [[-22, -26], [-4, -28], [0, -12], [-18, -10]], LG(g2, 0, -28, 0, -10, SKIN));
     } else {
       // cano + tubo
       g2.fillStyle = LG(g2, 0, -66, 0, -56, MET);
@@ -854,7 +935,7 @@ const Tex = (function () {
     const cv = cnv(280, 280), g = cv.getContext('2d');
     g.translate(160, 210);
     weaponArt(g, kind);
-    const TIP = { pistol: [-97, -42], pistol50: [-107, -45], rifle: [-131, -53], shotgun: [-117, -61], mg: [-131, -55] };
+    const TIP = { pistol: [-97, -42], pistol50: [-107, -45], rifle: [-131, -53], shotgun: [-117, -61], mg: [-131, -55], grenade_he: [-58, -34], grenade_smoke: [-58, -34], grenade_flash: [-58, -34] };
     const c0 = Math.cos(0.30), s0 = Math.sin(0.30);
     return {
       cv: cv, ox: 160, oy: 210,
@@ -862,7 +943,7 @@ const Tex = (function () {
       tipY: TIP[kind][0] * s0 + TIP[kind][1] * c0
     };
   }
-  const weapons = { pistol: makeWeaponSprite('pistol'), pistol50: makeWeaponSprite('pistol50'), shotgun: makeWeaponSprite('shotgun'), rifle: makeWeaponSprite('rifle'), mg: makeWeaponSprite('mg') };
+  const weapons = { pistol: makeWeaponSprite('pistol'), pistol50: makeWeaponSprite('pistol50'), shotgun: makeWeaponSprite('shotgun'), rifle: makeWeaponSprite('rifle'), mg: makeWeaponSprite('mg'), grenade_he: makeWeaponSprite('grenade_he'), grenade_smoke: makeWeaponSprite('grenade_smoke'), grenade_flash: makeWeaponSprite('grenade_flash') };
 
   return {
     weapons: weapons,
@@ -874,6 +955,9 @@ const Tex = (function () {
     scenery: { truck: truck(), car: car() },
     bot: [soldier(0), soldier(1), soldier(2), soldier(3), soldier(4), soldier(5), soldier(6)],
     pickups: { health: medkit(), ammo: ammoBox(), armor: vest() },
+    nades: { grenade_he: nadeTex('he'), grenade_smoke: nadeTex('smoke'), grenade_flash: nadeTex('flash') },
+    smokePuff: smokePuffTex(),
+    boom: boomTex(),
     blood: bloodTex(),
     dust: dustTex()
   };
