@@ -1,6 +1,8 @@
 /* Hell Protocol — rede multiplayer: WebRTC P2P autoritativo no host.
    Conexões: BroadcastChannel (abas do mesmo navegador) + sala de 6 dígitos
-   sinalizada por MQTT em brokers públicos (entre aparelhos diferentes). */
+   sinalizada por MQTT em brokers públicos (entre aparelhos diferentes).
+   Entre redes diferentes o NAT pode bloquear a conexão direta — nesse caso um
+   TÚNEL automático pelos próprios brokers MQTT transporta os dados do jogo. */
 (function () {
 'use strict';
 
@@ -33,6 +35,14 @@ let joinTentativas = 0;     // convidado: quantas tentativas de entrada foram en
 let hostJoins = 0;          // host: quantas tentativas de entrada chegaram pela sinalização
 let onBroker = null;        // callback de estado por sinalizador (diagnóstico na UI)
 let onStage = null;         // callback de progresso da conexão (mostrado na UI)
+let onTransport = null;     // callback de mudança de transporte (P2P <-> túnel)
+// túnel de dados (fallback entre redes diferentes — declarações abaixo, seção própria)
+let tunConns = [];          // conexões MQTT dedicadas ao túnel: [{m, broker, idx}]
+let tunStarting = false;    // tunnelEnsure em andamento
+let tunReconn = {};         // idx -> timer de reconexão do túnel
+let tunOutbox = [];         // mensagens esperando o túnel conectar (cap 24)
+let tunSeen = {};           // dedupe: remetente -> { set: sequências recebidas }
+let seqOut = 1;             // sequência das mensagens enviadas (dedupe nas duas pontas)
 // sinalização via API própria (Vercel + KV) — automática quando /api/ping responde ok
 // API_EXTERNA: se o jogo estiver rodando em localhost/file:// (onde não há /api),
 // pode apontar direto para a API do Vercel — ex: 'https://seu-projeto.vercel.app'.
@@ -86,8 +96,9 @@ function roomCloseConns() {
 }
 
 function peers() {
+  // peers alcanáveis: canal direto aberto OU túnel ativo
   const out = [];
-  for (const id in rtcPeers) if (rtcPeers[id].open) out.push(id);
+  for (const id in rtcPeers) if (rtcPeers[id].open || rtcPeers[id].tunnel) out.push(id);
   return out;
 }
 function lobbyList() {
@@ -343,6 +354,141 @@ function roomConnDropped(idx) {
 }
 function brokerName(url) { return String(url).split('/')[2]; }
 
+// ---------- túnel de dados via MQTT (fallback para redes diferentes) ----------
+// Entre redes diferentes, o NAT pode bloquear a conexão direta do WebRTC
+// (NAT simétrico/CGNAT — comum em 4G/5G — não é atravessado por STUN puro).
+// Quando o canal direto não abre (ou cai no meio da partida), os dados do jogo
+// passam a fluir pelos MESMOS brokers MQTT públicos da sinalização: só é preciso
+// WebSocket de SAÍDA, que funciona em qualquer rede, sem TURN e sem configurar
+// nada. Custo: mais lag (a mensagem vai até o broker e volta) — se o canal
+// direto abrir depois, o tráfego volta automaticamente para o P2P.
+// Usa apenas os 3 brokers TLS (wss funciona em página HTTP, HTTPS e file://).
+const TUN_BROKERS = BROKERS.filter(function (u) { return u.indexOf('wss://') === 0; }).slice(0, 3);
+function topicD(gid) { return 'hp/' + room + '/d/' + gid; }
+function topicDAll() { return 'hp/' + room + '/d/+'; }
+// atraso antes de desistir do canal direto e ativar o túnel (gancho p/ testes)
+function tunelDelay() {
+  const v = (typeof window !== 'undefined') ? window.__HP_TUNNEL_MS : null;
+  return (typeof v === 'number' && v > 0) ? v : 9000;
+}
+// garante conexões de túnel com os brokers (conecta nos que faltam)
+function tunnelEnsure() {
+  if (!room || tunStarting || TUN_BROKERS.length === 0) return;
+  const ep = roomEpoch;
+  const faltando = [];
+  for (let i = 0; i < TUN_BROKERS.length; i++) {
+    if (!tunConns.some(function (c) { return c.idx === i; })) faltando.push(i);
+  }
+  if (faltando.length === 0) { tunnelFlush(); return; }
+  tunStarting = true;
+  let pend = faltando.length;
+  for (const idx of faltando) {
+    mqttConnect(TUN_BROKERS[idx], 'hpd' + Date.now().toString(36) + idx + Math.floor(Math.random() * 1e4).toString(36),
+      function (t, p) { tunnelOnMessage(t, p); },
+      function () { tunnelConnDropped(idx); })
+      .then(function (m) {
+        if (ep !== roomEpoch) { try { m.close(); } catch (e) {} return; }
+        if (!tunConns.some(function (c) { return c.idx === idx; })) tunConns.push({ m: m, broker: TUN_BROKERS[idx], idx: idx });
+        m.subscribe(topicDAll());
+        console.log('[sala] túnel conectado em', brokerName(TUN_BROKERS[idx]));
+      })
+      .catch(function () {
+        if (onBroker) onBroker(brokerName(TUN_BROKERS[idx]) + ' (túnel)', 'falhou');
+      })
+      .then(function () {
+        pend--;
+        if (pend > 0 || ep !== roomEpoch) return;
+        tunStarting = false;
+        if (tunConns.length === 0) {
+          if (onTransport) onTransport('Túnel sem conexão com os brokers — tentando de novo…');
+          setTimeout(function () { if (ep === roomEpoch && room) tunnelEnsure(); }, 3000);
+        } else {
+          if (onBroker) onBroker('túnel', 'conectado (' + tunConns.length + ')');
+          tunnelFlush();
+        }
+      });
+  }
+}
+function tunnelConnDropped(idx) {
+  tunConns = tunConns.filter(function (c) { return c.idx !== idx; });
+  if (!room || tunReconn[idx]) return;
+  tunReconn[idx] = setTimeout(function () {
+    delete tunReconn[idx];
+    if (room) tunnelEnsure();
+  }, 3000);
+}
+// publica no tópico do remetente em TODOS os brokers do túnel — quem sinalizou
+// com sucesso compartilha pelo menos um broker com o outro lado da sala
+function tunnelPublish(text) {
+  if (tunConns.length) {
+    for (let i = 0; i < tunConns.length; i++) { try { tunConns[i].m.publish(topicD(myId), text); } catch (e) {} }
+    return;
+  }
+  if (tunOutbox.length >= 24) tunOutbox.shift();
+  tunOutbox.push(text);
+  tunnelEnsure();
+}
+function tunnelFlush() {
+  if (!tunConns.length || !tunOutbox.length) return;
+  const fila = tunOutbox; tunOutbox = [];
+  for (const text of fila) {
+    for (let i = 0; i < tunConns.length; i++) { try { tunConns[i].m.publish(topicD(myId), text); } catch (e) {} }
+  }
+}
+function tunnelCloseAll() {
+  for (const k in tunReconn) { clearTimeout(tunReconn[k]); delete tunReconn[k]; }
+  for (let i = 0; i < tunConns.length; i++) { try { tunConns[i].m.close(); } catch (e) {} }
+  tunConns = [];
+  tunOutbox = [];
+  tunSeen = {};
+  tunStarting = false;
+}
+// ativa o túnel para um peer (marca, conecta e avisa a UI)
+function tunnelActivate(id) {
+  if (!room || role === 'off') return;
+  const p = rtcPeers[id] || (rtcPeers[id] = { pc: null, dc: null, open: false });
+  const novo = !p.tunnel;
+  p.tunnel = true;
+  if (novo) {
+    if (onPeers) onPeers(peers());
+    if (onTransport) onTransport('Conexão direta indisponível — jogando via túnel automático pela internet (lag maior).');
+  }
+  tunnelEnsure();
+}
+// mensagem chegando pelo túnel: valida, registra o remetente e entrega com dedupe
+function tunnelOnMessage(topic, payload) {
+  if (!room || String(topic).indexOf('hp/' + room + '/d/') !== 0) return;
+  let env = null;
+  try { env = JSON.parse(payload); } catch (e) { return; }
+  if (!env || typeof env.s !== 'number' || env.d === undefined || !env.f || env.f === myId) return;
+  const p = rtcPeers[env.f];
+  if (!p) {
+    rtcPeers[env.f] = { pc: null, dc: null, open: false, tunnel: true };
+    if (onPeers) onPeers(peers());
+    tunnelEnsure(); // recebemos por túnel — precisamos conseguir responder por ele
+  } else if (!p.tunnel) {
+    p.tunnel = true;
+    if (onPeers) onPeers(peers());
+  }
+  deliver(payload, env.f);
+}
+// entrega uma mensagem (envelope {f,s,d}) com dedupe por remetente/sequência —
+// o mesmo texto pode chegar pelo canal direto E pelo túnel (ou por 2 brokers)
+function deliver(text, fallbackId) {
+  let env = null;
+  try { env = JSON.parse(text); } catch (e) { return; }
+  let from = fallbackId, data = env;
+  if (env && typeof env.s === 'number' && env.d !== undefined && env.f) {
+    from = env.f; data = env.d;
+    let st = tunSeen[from];
+    if (!st) st = tunSeen[from] = { set: new Set() };
+    if (st.set.has(env.s)) return;
+    st.set.add(env.s);
+    if (st.set.size > 400) st.set = new Set([env.s]);
+  }
+  if (onMsg) onMsg(data, from);
+}
+
 // ---------- sala de 6 dígitos (host gera; convidados entram) ----------
 function topicJoin() { return 'hp/' + room + '/j'; }
 function topicOf(gid) { return 'hp/' + room + '/o/' + gid; }
@@ -500,7 +646,19 @@ function hostRoomAnswer(gid, answer) {
   const p = rtcPeers[gid];
   if (!p || p.answered) return;
   p.answered = true;
-  p.pc.setRemoteDescription(answer).catch(function () { p.answered = false; });
+  p.pc.setRemoteDescription(answer).then(function () {
+    // rede de segurança do host: se o canal direto não abrir (NAT bloqueando entre
+    // redes diferentes), o túnel automático assume — o convidado costuma ativar
+    // primeiro (ao receber a primeira mensagem dele, o túnel já é garantido)
+    const ep = roomEpoch;
+    setTimeout(function () {
+      if (ep !== roomEpoch || !rtcPeers[gid]) return;
+      if (!rtcPeers[gid].open && !rtcPeers[gid].tunnel) {
+        tunnelActivate(gid);
+        if (onStage) onStage('Conexão direta não abriu com um convidado — túnel automático ativado.');
+      }
+    }, tunelDelay() + 3000);
+  }).catch(function () { p.answered = false; });
 }
 // convidado: entra na sala pelo código de 6 dígitos — fica tentando (conexão + join)
 // em todos os sinalizadores por até 30s, contornando oscilações de broker/rede
@@ -549,13 +707,18 @@ function joinRoom(code) {
             rtcPeers[myId].answerSdp = desc;
             roomPublish(topicAn(myId), JSON.stringify({ a: desc }));
             resolve();
-            // sinalizou, mas o canal direto precisa abrir: se não abrir, avisa a causa provável
+            // sinalizou, mas o canal direto pode NÃO abrir: NATs simétricos/CGNAT
+            // (comuns em 4G/5G) bloqueiam o WebRTC entre redes diferentes. Se não
+            // abrir em ~9s, o túnel automático via brokers assume — a partida
+            // acontece mesmo assim (com mais lag). Se abrir depois, volta ao P2P.
             setTimeout(function () {
               if (ep !== roomEpoch) return;
-              if (!(rtcPeers[myId] && rtcPeers[myId].open) && onStage) {
-                onStage('Sala encontrada, mas a conexão direta não abriu — aparelhos em redes diferentes podem bloquear o WebRTC. Tente na mesma rede Wi-Fi.');
+              const me = rtcPeers[myId];
+              if (me && !me.open && !me.tunnel) {
+                tunnelActivate(myId);
+                if (onStage) onStage('Conexão direta indisponível — ativando túnel automático pela internet…');
               }
-            }, 15000);
+            }, tunelDelay());
           }).catch(reject);
       } catch (e) {
         if (onStage) onStage('Erro ao processar a mensagem da sala: ' + (e && e.message));
@@ -619,37 +782,56 @@ function joinRoom(code) {
   });
 }
 function makePc() {
-  // STUN do Google: descobre o IP público para conectar entre redes diferentes.
-  // (O TURN público openrelay.metered.ca morreu — testado: TCP recusado nas 3 portas —
-  // e o navegador esperava o timeout dele, atrasando/cortando a coleta de candidatos.
-  // Sem TURN, na MESMA rede Wi-Fi a conexão é direta via candidatos de rede local;
-  // entre redes diferentes funciona quando o NAT permite conexão direta via STUN.)
-  return new RTCPeerConnection({
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' }
-    ]
-  });
+  // STUN descobre o IP público para conectar entre redes diferentes — funciona
+  // quando o NAT permite conexão direta; na mesma rede Wi-Fi é sempre direto.
+  // (O TURN público openrelay.metered.ca morreu — testado: TCP recusado nas 3
+  // portas — e o navegador esperava o timeout dele, atrasando a coleta.)
+  // TURN OPCIONAL: quem tiver um servidor TURN (coturn próprio, Cloudflare etc.)
+  // configura localStorage.hpTurn = '{"urls":"turn:host:3478","username":"x","credential":"y"}'
+  // e ele entra na frente da lista — conexão direta garantida em qualquer NAT.
+  const servers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun.cloudflare.com:3478' }
+  ];
+  const turn = turnConfig();
+  if (turn) servers.unshift(turn);
+  return new RTCPeerConnection({ iceServers: servers });
+}
+function turnConfig() {
+  try {
+    const raw = (typeof localStorage !== 'undefined') ? localStorage.getItem('hpTurn') : null;
+    if (!raw) return null;
+    const v = JSON.parse(raw);
+    const urls = Array.isArray(v) ? v : (v && v.urls);
+    if (!urls) return null;
+    const conf = { urls: urls };
+    if (v && v.username) conf.username = String(v.username);
+    if (v && v.credential) conf.credential = String(v.credential);
+    return conf;
+  } catch (e) { return null; }
 }
 function wireChannel(id, dc) {
   dc.onopen = function () {
     rtcPeers[id].open = true;
+    if (rtcPeers[id].tunnel && onTransport) onTransport('Conexão direta restabelecida — de volta ao P2P (menor lag).');
     if (onPeers) onPeers(peers());
     if (role === 'host') broadcastLobby();
   };
-  dc.onclose = function () { rtcPeers[id].open = false; if (onPeers) onPeers(peers()); };
-  dc.onmessage = function (ev) {
-    let d;
-    try { d = JSON.parse(ev.data); } catch (e) { return; }
-    if (onMsg) onMsg(d, id);
+  dc.onclose = function () {
+    rtcPeers[id].open = false;
+    // caiu no meio da sessão: o túnel assume na hora (sem esperar timer)
+    if (room && role !== 'off' && !rtcPeers[id].tunnel) tunnelActivate(id);
+    else if (onPeers) onPeers(peers());
   };
+  dc.onmessage = function (ev) { deliver(ev.data, id); };
 }
 
 // ---------- HOST ----------
 function host(name) {
   if (!hasRTC) return { ok: false, err: 'WebRTC não suportado neste navegador.' };
   role = 'host';
-  serverName = name || 'Servidor LAN';
+  serverName = name || 'Servidor';
   rtcPeers = {};
   listenLobby();
   startLobbyBeacon();
@@ -680,12 +862,19 @@ function joinLobbyServer(sid) {
 
 // ---------- mensagens ----------
 function send(data) {
-  const json = JSON.stringify(data);
+  // envelope {f,s,d}: remetente + sequência — permite dedupe quando a mesma
+  // mensagem chega por caminhos diferentes (canal direto e túnel, 2 brokers…)
+  const json = JSON.stringify({ f: myId, s: seqOut++, d: data });
+  let tunelNecessario = false;
   for (const id in rtcPeers) {
-    if (rtcPeers[id].open) {
-      try { rtcPeers[id].dc.send(json); } catch (e) {}
+    const p = rtcPeers[id];
+    if (p.open) {
+      try { p.dc.send(json); } catch (e) {}
+    } else if (room) {
+      tunelNecessario = true; // peer sem canal direto: entrega via túnel (difusão única)
     }
   }
+  if (tunelNecessario) tunnelPublish(json);
 }
 function stop() {
   role = 'off';
@@ -696,6 +885,8 @@ function stop() {
   for (const k in roomReconn) { clearTimeout(roomReconn[k]); delete roomReconn[k]; }
   offerPubT = {};
   room = '';
+  tunnelCloseAll();
+  seqOut = 1;
   if (beaconTimer) { clearInterval(beaconTimer); beaconTimer = null; }
   for (const id in rtcPeers) {
     try { rtcPeers[id].pc.close(); } catch (e) {}
@@ -726,11 +917,16 @@ window.Net = {
       brokers: roomConns.map(function (c) { return brokerName(c.broker); }),
       joinTentativas: joinTentativas,
       hostJoins: hostJoins,
+      tunel: {
+        ativo: tunConns.length > 0,
+        brokers: tunConns.map(function (c) { return brokerName(c.broker); }),
+        pendentes: tunOutbox.length
+      },
       peers: []
     };
     for (const id in rtcPeers) {
       const p = rtcPeers[id];
-      out.peers.push({ id: id, open: !!p.open, hasOffer: !!(p.offerSdp || (p.pc && p.pc.localDescription)), hasAnswer: !!(p.pc && p.pc.remoteDescription) });
+      out.peers.push({ id: id, open: !!p.open, tunel: !!p.tunnel, hasOffer: !!(p.offerSdp || (p.pc && p.pc.localDescription)), hasAnswer: !!(p.pc && p.pc.remoteDescription) });
     }
     return out;
   },
@@ -738,6 +934,8 @@ window.Net = {
   onStage: function (cb) { onStage = cb; },
   // estado por sinalizador (diagnóstico ao vivo na tela de entrada)
   onBroker: function (cb) { onBroker = cb; },
+  // mudança de transporte (P2P <-> túnel automático) — o jogo mostra na tela
+  onTransport: function (cb) { onTransport = cb; },
   onMsg: function (cb) { onMsg = cb; },
   onPeers: function (cb) { onPeers = cb; },
   onLobby: function (cb) { onLobby = cb; },

@@ -1087,7 +1087,7 @@ $('pbackYes').addEventListener('click', function (e) {
   goMenu();
 });
 
-// ---------- multiplayer LAN (WebRTC P2P — host autoritativo) ----------
+// ---------- multiplayer online (WebRTC P2P — host autoritativo; túnel MQTT quando o NAT bloqueia) ----------
 let mpOn = false;                    // modo multiplayer ativo
 let mpRole = 'off';                  // 'off' | 'host' | 'guest'
 let mpReady = false;                 // partida multiplayer em execução
@@ -1096,6 +1096,9 @@ let mpPeerDone = false;              // outro player morreu/concluiu a rodada
 let mpDoneSent = false;              // já avisei o peer que concluí/morri nesta rodada
 let mpName = 'Jogador';
 let mpTimer = 0;
+let mpUltAvisoTunel = '';            // evita repetir o aviso de troca de transporte no feed
+let mpHiT = null;                    // reenvio do 'hi' até o host confirmar com 'world' (túnel)
+let mpWorldOk = false;               // host confirmou o 'hi' (mundo recebido)
 const mpBrokerStates = {};           // diagnóstico: estado de cada sinalizador
 // desconecta e reseta todo o estado multiplayer (chamado ao voltar ao menu)
 function mpDisconnect() {
@@ -1113,6 +1116,9 @@ function mpDisconnect() {
   mpPeerDone = false;
   mpDoneSent = false;
   mpTimer = 0;
+  mpUltAvisoTunel = '';
+  mpWorldOk = false;
+  if (mpHiT) { clearInterval(mpHiT); mpHiT = null; }
   for (const id in mpRemote) delete mpRemote[id];
   const mpMapSelEl = $('mpMapSel');
   if (mpMapSelEl) mpMapSelEl.disabled = false; // libera a escolha de mapa para a próxima partida
@@ -1144,14 +1150,29 @@ function mpConnectNet() {
     const el = $('mpBrokers');
     if (el) el.textContent = parts.join(' · ');
   });
+  Net.onTransport(function (txt) {
+    // mudança de transporte (P2P <-> túnel automático): status na sala + aviso no feed
+    if (!txt) return;
+    if (mpRole === 'host') $('mpStatus').textContent = txt;
+    else if (mpRole === 'guest') mpGuestMsg(txt);
+    if (mpOn && mpReady && txt !== mpUltAvisoTunel) { mpUltAvisoTunel = txt; addFeed(txt); }
+  });
   return true;
 }
 function mpUpdatePeers(list) {
   // convidado: quando o canal abre, apresenta-se e aguarda o host iniciar a partida
   if (mpRole === 'guest' && !mpOn && list.length > 0) {
     mpOn = true;
+    mpWorldOk = false;
     Net.send({ t: 'hi', n: mpName });
     mpGuestMsg('Conectado! Aguardando o host iniciar a partida…');
+    // pelo túnel, a 1ª mensagem pode se perder antes do host conectar os brokers —
+    // reenvia o 'hi' a cada 1s até o host confirmar com o 'world'
+    if (mpHiT) clearInterval(mpHiT);
+    mpHiT = setInterval(function () {
+      if (!mpOn || mpWorldOk || mpRole !== 'guest') { clearInterval(mpHiT); mpHiT = null; return; }
+      Net.send({ t: 'hi', n: mpName });
+    }, 1000);
   }
   if (!mpOn) return;
   for (const id in mpRemote) {
@@ -1165,11 +1186,12 @@ function mpUpdatePeers(list) {
 function mpOnMsg(d, from) {
   if (d.t === 'hi') {
     if (!mpOn) return;
+    const novo = !mpRemote[from];
     mpRemote[from] = { x: 12.5, y: 21.5, a: 0, hp: 100, name: d.n || 'Jogador' };
     if (mpRole === 'host') {
-      // informa ao convidado o estado atual do mundo
+      // informa ao convidado o estado atual do mundo (reenvio é inofensivo)
       Net.send({ t: 'world', map: selectedMap, round: round, phase: state });
-      addFeed(d.n + ' entrou no servidor');
+      if (novo) addFeed(d.n + ' entrou no servidor');
     }
     return;
   }
@@ -1180,6 +1202,7 @@ function mpOnMsg(d, from) {
     return;
   }
   if (d.t === 'world' && mpRole === 'guest') {
+    mpWorldOk = true; // host confirmou o 'hi' — para o reenvio
     selectedMap = d.map;
     if (d.phase === 'play' && state === 'menu') mpGuestStart(d.round);
     return;
@@ -1369,9 +1392,9 @@ $('mpStart').addEventListener('click', function () {
     const modo = Net.modo || '?';
     let msg = 'Servidor no ar (sinalização: ' + modo + ') — aguardando jogadores…';
     if (modo === 'MQTT') {
-      msg += ' · O celular deve abrir a MESMA URL deste PC.';
+      msg += ' · O código funciona entre redes diferentes (pela internet): se a conexão direta falhar, o túnel automático assume.';
       if (/localhost|127\.0\.0\.1/.test(location.hostname)) {
-        msg += ' Em localhost, abra no celular http://IP-DO-PC:8000 (servidor.py, mesma rede).';
+        msg += ' Convidados fora deste PC: abram o jogo por uma URL pública (GitHub Pages/Vercel) ou pelo http://IP-DO-PC:8000 na mesma rede.';
       }
     }
     $('mpStatus').textContent = msg;
@@ -1711,7 +1734,7 @@ if (isMobile) {
 requestAnimationFrame(loop);
 
 // marca de build — permite conferir (console do PC / telas do multiplayer) se o navegador carregou ESTE arquivo
-const OT_BUILD = 'v12 — sinalização via API própria (Vercel+KV) com MQTT de reserva';
+const OT_BUILD = 'v13 — multiplayer entre redes: túnel MQTT automático + TURN opcional';
 console.log('[Operação Tática] game.js build ' + OT_BUILD);
 const mpVersionEl = $('mpVersion');
 if (mpVersionEl) mpVersionEl.textContent = 'build ' + OT_BUILD;

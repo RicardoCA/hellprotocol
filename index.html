@@ -252,10 +252,10 @@
         <button class="modeopt" id="play">Jogar</button>
         <button class="modeopt" id="backMode1">Voltar</button>
       </div>
-      <!-- tela 2b: multiplayer LAN (WebRTC P2P, sem backend) -->
+      <!-- tela 2b: multiplayer online (WebRTC P2P + túnel MQTT quando o NAT bloqueia) -->
       <div id="mpMenu" class="hidden">
         <div id="mpHome">
-          <p>Multiplayer — o host cria uma sala e compartilha o <b>código de 6 dígitos</b> com os convidados.</p>
+          <p>Multiplayer — o host cria uma sala e compartilha o <b>código de 6 dígitos</b> com os convidados. Funciona <b>entre redes diferentes</b> (pela internet): se a conexão direta falhar, um túnel automático assume.</p>
           <button class="modeopt" id="mpHost">Host</button>
           <button class="modeopt" id="mpBrowse">Entrar na Sala</button>
           <p id="mpMsg" class="finemode"></p>
@@ -345,11 +345,11 @@
   </div>
 </div>
 
-<script src="audio.js?v=12"></script>
-<script src="textures.js?v=12"></script>
-<script src="engine.js?v=12"></script>
-<script src="net.js?v=12"></script>
-<script src="game.js?v=12"></script>
+<script src="audio.js?v=13"></script>
+<script src="textures.js?v=13"></script>
+<script src="engine.js?v=13"></script>
+<script src="net.js?v=13"></script>
+<script src="game.js?v=13"></script>
 <script>
 // Service Worker: garante que o GitHub Pages sirva sempre a versão mais recente
 // (rede-primeiro sem cache HTTP). Registrado apenas em HTTPS/localhost.
